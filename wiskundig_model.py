@@ -16,7 +16,7 @@ distance_matrix = all_sheets['Afstandsmatrix']
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
 charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 /60 # kwh per minuut bij opladen van 90% tot 100%
+charging_time_10 = 60 / 60 # kwh per minuut bij opladen van 90% tot 100%
 actual_capacity_90 = max_capacity * 0.9
 actual_capacity = actual_capacity_90 
 daytime_limit = actual_capacity_90 *0.9
@@ -56,15 +56,15 @@ def calculate_end_time(row):
         return None 
 schedule['eindtijd'] = schedule.apply(calculate_end_time, axis=1)
 
-def charging(battery, actual_capacity, current_time, starting_time, end_time):
+def charging(battery, actual_capacity, current_time, start_time, end_time):
     """
     Beheren batterijstatus met verschillende regels voor opladen.
     Parameters: 
         - battery: huidige batterijpercentage in kWh
-        - Dcap: batterijcapaciteit
-        - huidige_tijd: het moment waarop de bus moet opladen
-        - vertrektijd: tijd van de eerste busrit
-        - eindtijd: tijd van de laatste busrit
+        - actual_capacity: batterijcapaciteit
+        - current_time: het moment waarop de bus moet opladen
+        - start_time: tijd van de eerste busrit
+        - end_time: tijd van de laatste busrit
     Output: Nieuwe batterij percentage in kWh
     """
     # Minimale batterijpercentage
@@ -75,7 +75,7 @@ def charging(battery, actual_capacity, current_time, starting_time, end_time):
     charging_per_min = charging_speed_90  # Oplaadsnelheid tot 90%
 
     # Oplaadlimiet afhankelijk van het moment van de dag
-    if current_time < starting_time or current_time > end_time:
+    if current_time < start_time or current_time > end_time:
         max_battery = max_battery_night
     else:
         max_battery = max_battery_day
@@ -98,10 +98,9 @@ def battery_consumption(distance, current_time, starting_time, end_time):
     Houdt rekening met opladen voor en na de dienstregeling.
     Parameters: 
         - distance: afstand van de rit in km
-        - huidige_tijd: huidige tijd van de busrit
-        - vertrektijd: tijd van de eerste rit.
-        - eindtijd: tijd van de laatste rit
-        - bus_type: SOH van de bus (85% of 95%)
+        - current_time: huidige tijd van de busrit
+        - start_time: tijd van de eerste rit.
+        - end_time: tijd van de laatste rit
     Output: Nieuwe batterijpercentage na de rit en eventuele oplaadbeurt.
     """
     # Selecteer de juiste batterijcapaciteit
@@ -133,3 +132,4 @@ Lijn 400 eerste rit vertrekt om 7:19 vanuit de airport (Apt) naar Eindhoven Cent
 Lijn 400 eerste rit vertrekt om 06:52 vanuit Eindhoven Centraal (bst) naar airport (Apt). 
 401 laatste rit van bst naar apt is om 19:37. Deze lijn zou klaar moeten zijn tussen de 19:58 en 20:00.  
 """
+
