@@ -131,11 +131,7 @@ else:
     print("Circuit planning failed continuity checks.")
     
 
-import pandas as pd
-schedule = pd.read_excel('Connexxion data - 2024-2025.xlsx', sheet_name='Dienstregeling')
-distance_matrix = pd.read_excel('Connexxion data - 2024-2025.xlsx', sheet_name='Afstandsmatrix' )
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
-
+# Yvonnes code
 def driven_rides(circuit_planning):
     """ displays which rides are droven
     Parameters
