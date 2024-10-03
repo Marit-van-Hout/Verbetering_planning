@@ -6,6 +6,14 @@ from io import StringIO
 from datetime import datetime, timedelta
 from wiskundig_model import charging
 
+distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name = "Afstandsmatrix" )
+all_sheets = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name = None)
+print("Beschikbare sheets in het bestand:", list(all_sheets.keys()))
+
+# we hebben 2 tabellen dus die kunnen we zo laten zien:
+schedule = all_sheets['Dienstregeling']
+distance_matrix = all_sheets['Afstandsmatrix']
+
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
 # 
