@@ -8,7 +8,7 @@ from synthesizing import charging
 
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
-# 
+
 circuit_planning = pd.read_excel('omloopplanning.xlsx')
 
 max_capacity = 300 # maximale capaciteit in kWH
@@ -20,8 +20,6 @@ actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
 actual_capacity = [actual_capacity_85, actual_capacity_95]
 daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
 consumption_per_km = [0.7, 2.5] # kWh per km
-
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
 
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
