@@ -4,12 +4,9 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from io import StringIO
 from datetime import datetime, timedelta
-from wiskundig_model import charging
 
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
-# 
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
 
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
@@ -20,18 +17,7 @@ actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
 actual_capacity = [actual_capacity_85, actual_capacity_95]
 daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
 consumption_per_km = [0.7, 2.5] # kWh per km
-
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
-
-max_capacity = 300 # maximale capaciteit in kWH
-SOH = [85, 95] # State of Health
-charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 / 60 # kwh per minuut bij oladen tot 10%
-actual_capacity_85 = max_capacity * 0.85 # (255 kWh)
-actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
-actual_capacity = [actual_capacity_85, actual_capacity_95]
-daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
-consumption_per_km = [0.7, 2.5] # kWh per km
+min_idle_time = 15
 
 # Functie om batterijstatus te berekenen
 def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
@@ -49,6 +35,23 @@ def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
     max_battery_day = actual_capacity * 0.9  # Maximaal 90% overdag
     max_battery_night = actual_capacity  # Maximaal 100% 's nachts
     min_charging_time = 15  # Minimaal 15 minuten opladen
+    
+    # Battery charging simulation
+def charging(battery, actual_capacity, current_time, start_time, end_time):
+    """Charge the battery based on the current time and bus schedule."""
+    min_battery = 0.10 * actual_capacity
+    max_battery_day = 0.90 * actual_capacity
+    max_battery_night = actual_capacity
+    charging_per_min = charging_speed_90
+
+    if current_time < start_time or current_time > end_time:
+        max_battery = max_battery_night
+    else:
+        max_battery = max_battery_day
+
+    charged_energy = min_idle_time * charging_per_min
+    new_battery = battery + charged_energy if battery <= min_battery else battery
+    return min(new_battery, max_battery)
 
     for i, row in circuit_planning.iterrows():
         # Converteer start en eindtijden naar datetime
