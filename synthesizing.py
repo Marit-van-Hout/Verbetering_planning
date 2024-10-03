@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Load data
-circulation_planning = pd.read_excel('omloopplanning.xlsx')
+uploaded_file = pd.read_excel('omloopplanning.xlsx')
 distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
 schedule = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
@@ -62,13 +62,13 @@ def charging(battery, actual_capacity, current_time, start_time, end_time):
     new_battery = battery + charged_energy if battery <= min_battery else battery
     return min(new_battery, max_battery)
 
-def simulate_battery(circulation_planning, actual_capacity, start_time, end_time):
+def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
     """Simulate battery usage throughout the day based on the circulation plan."""
     battery = actual_capacity * 0.9
     min_battery = actual_capacity * 0.1
 
     # Converteer start en eindtijden naar datetime
-    for i, row in circulation_planning.iterrows():
+    for i, row in uploaded_file.iterrows():
         start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
         end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
         
@@ -184,10 +184,10 @@ def every_ride_covered(circulation_planning, schedule):
     if difference_circulation_to_schedule.empty and difference_schedule_to_circulation.empty:
         return "Circulation planning is equal to timetable"
        
-circulation_planning = driven_rides(circulation_planning)
-circulation_planning = normalize_time_format(circulation_planning, "starttijd")
+uploaded_file = driven_rides(uploaded_file)
+uploaded_file = normalize_time_format(uploaded_file, "starttijd")
 
-result = every_ride_covered(circulation_planning, schedule)
+result = every_ride_covered(uploaded_file, schedule)
 
 print(result)
 
@@ -243,4 +243,4 @@ def remove_startingtime_endtime_equal(circulation_planning):
     clean_circulation_planning = circulation_planning[circulation_planning['starttijd'] != circulation_planning['eindtijd']]
     return clean_circulation_planning
 
-new_planning = remove_startingtime_endtime_equal(circulation_planning)
+new_planning = remove_startingtime_endtime_equal(uploaded_file)
