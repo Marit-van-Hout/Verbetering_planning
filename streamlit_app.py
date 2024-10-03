@@ -4,9 +4,12 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from io import StringIO
 from datetime import datetime, timedelta
+from wiskundig_model import charging
 
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
+# 
+circuit_planning = pd.read_excel('omloopplanning.xlsx')
 
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
@@ -17,7 +20,6 @@ actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
 actual_capacity = [actual_capacity_85, actual_capacity_95]
 daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
 consumption_per_km = [0.7, 2.5] # kWh per km
-min_idle_time = 15
 
 # Functie om batterijstatus te berekenen
 def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
@@ -35,23 +37,6 @@ def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
     max_battery_day = actual_capacity * 0.9  # Maximaal 90% overdag
     max_battery_night = actual_capacity  # Maximaal 100% 's nachts
     min_charging_time = 15  # Minimaal 15 minuten opladen
-    
-    # Battery charging simulation
-def charging(battery, actual_capacity, current_time, start_time, end_time):
-    """Charge the battery based on the current time and bus schedule."""
-    min_battery = 0.10 * actual_capacity
-    max_battery_day = 0.90 * actual_capacity
-    max_battery_night = actual_capacity
-    charging_per_min = charging_speed_90
-
-    if current_time < start_time or current_time > end_time:
-        max_battery = max_battery_night
-    else:
-        max_battery = max_battery_day
-
-    charged_energy = min_idle_time * charging_per_min
-    new_battery = battery + charged_energy if battery <= min_battery else battery
-    return min(new_battery, max_battery)
 
     for i, row in circuit_planning.iterrows():
         # Converteer start en eindtijden naar datetime
@@ -127,13 +112,13 @@ end_time = datetime.strptime('00:00', '%H:%M')
 simulate_battery(circuit_planning, actual_capacity, starting_time, end_time)
 check_route_continuity(circuit_planning)
 
-st.title("🚌 Circulation Planning Checker")
+st.title("🚌 Oploopschema Validatie App")
 st.write(
-    "Instantly validate your circulation planning for compliance!"
+    "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema.)."
 ) 
 
 # Bestand uploaden (CSV of Excel)
-uploaded_file = st.file_uploader("Drag and drop your circulation planning (CSV or Excel file)", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("Upload je oploopschema (CSV of Excel)", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
     try:
@@ -143,7 +128,7 @@ if uploaded_file is not None:
         else:
             data = pd.read_csv(uploaded_file)
         
-        st.write("**Your circulation planning:**")
+        st.write("**Geüpload Oploopschema:**")
         st.dataframe(data)
         
         # Validatie functie (voorbeeld)
@@ -185,20 +170,29 @@ if uploaded_file is not None:
         validation_errors = validate_schema(data)
         
         if validation_errors:
-            st.error("File processed successfully. A few mistakes were found in the circulation planning:")
+            st.error("Er zijn fouten gevonden in het oploopschema:")
             for error in validation_errors:
                 st.error(error)
         else:
-            st.success("File processed successfully. No errors found in the bus planning.")
-                   
+            st.success("Het oploopschema is geldig!")
+            
+            # Voeg een downloadknop toe voor het gevalideerde schema
+            csv = data.to_csv(index=False)
+            st.download_button(
+                label="Download gevalideerd schema als CSV",
+                data=csv,
+                file_name='gevalideerd_oploopschema.csv',
+                mime='text/csv'
+            )
+            
             # Optionele visualisatie
-            st.write("**Visualisation of the circulation planning:**")
+            st.write("**Visualisatie van het Oploopschema:**")
             fig, ax = plt.subplots()
             ax.scatter(data['speed'], data['energy'])
-            ax.set_xlabel('Speed (km/h)')
-            ax.set_ylabel('Energy consumption (kWh)')
-            ax.set_title('Speed vs energy consumption')
+            ax.set_xlabel('Snelheid (km/uur)')
+            ax.set_ylabel('Energieverbruik (kWh)')
+            ax.set_title('Snelheid vs Energieverbruik')
             st.pyplot(fig)
     
     except Exception as e:
-        st.error(f"There was an error processing the file: {str(e)}")
+        st.error(f"Er is een fout opgetreden bij het verwerken van het bestand: {str(e)}")
