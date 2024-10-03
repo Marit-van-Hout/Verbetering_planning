@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from io import StringIO
 from datetime import datetime, timedelta
-from wiskundig_model import charging
 
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
