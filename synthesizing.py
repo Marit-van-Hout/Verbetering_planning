@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Load data
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
+circulation_planning = pd.read_excel('omloopplanning.xlsx')
 distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
 schedule = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
@@ -63,13 +63,13 @@ def charging(battery, actual_capacity, current_time, start_time, end_time):
     new_battery = battery + charged_energy if battery <= min_battery else battery
     return min(new_battery, max_battery)
 
-def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
-    """Simulate battery usage throughout the day based on the circuit plan."""
+def simulate_battery(circulation_planning, actual_capacity, start_time, end_time):
+    """Simulate battery usage throughout the day based on the circulation plan."""
     battery = actual_capacity * 0.9
     min_battery = actual_capacity * 0.1
 
     # Converteer start en eindtijden naar datetime
-    for i, row in circuit_planning.iterrows():
+    for i, row in circulation_planning.iterrows():
         start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
         end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
         
@@ -97,18 +97,18 @@ def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
     return battery
 
 # Functie om routecontinuïteit te controleren
-def check_route_continuity(circuit_planning):
+def check_route_continuity(circulation_planning):
     """
     Controleer of het eindpunt van route n overeenkomt met het startpunt van route n+1.
     Parameters:
-        - circuit_planning: DataFrame met routegegevens.
+        - circulation_planning: DataFrame met routegegevens.
     Output: Print meldingen als er inconsistenties zijn.
     """
-    for i in range(len(circuit_planning) - 1):
-        current_end_location = circuit_planning.iloc[i]['eindlocatie']
-        next_start_location = circuit_planning.iloc[i+1]['startlocatie']
+    for i in range(len(circulation_planning) - 1):
+        current_end_location = circulation_planning.iloc[i]['eindlocatie']
+        next_start_location = circulation_planning.iloc[i+1]['startlocatie']
         if current_end_location != next_start_location:
-            print(f"Warning: Route continuity issue between {circuit_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
+            print(f"Warning: Route continuity issue between {circulation_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
             return False
            
     return True
@@ -121,18 +121,8 @@ def battery_consumption(distance, current_time, start_time, end_time):
     
     return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
 
-# Run checks and simulation
-if check_route_continuity(circuit_planning):
-    starting_time = datetime.strptime('06:00', '%H:%M')
-    ending_time = datetime.strptime('00:00', '%H:%M')
-    final_battery = simulate_battery(circuit_planning, actual_capacity, starting_time, ending_time)
-    print(f"Final battery status: {final_battery:.0f} kWh")
-else:
-    print("Circuit planning failed continuity checks.")
-    
-
 # Yvonnes code
-def driven_rides(circuit_planning):
+def driven_rides(circulation_planning):
     """ displays which rides are droven
     Parameters
         omloopplanning: DataFrame
@@ -142,9 +132,9 @@ def driven_rides(circuit_planning):
         A cleaned circulation planning DataFrame containing only the relevant columns 
         and rows where a bus line is present.
     """
-    clean_circuit_planning = circuit_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
-    clean_circuit_planning = clean_circuit_planning.dropna(subset=['buslijn'])
-    return clean_circuit_planning
+    clean_circulation_planning = circulation_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
+    clean_circulation_planning = clean_circulation_planning.dropna(subset=['buslijn'])
+    return clean_circulation_planning
 
 def normalize_time_format(df, time_column):
     """Convert time to a uniform format, ignoring seconds
@@ -160,7 +150,7 @@ def normalize_time_format(df, time_column):
     df[time_column] = pd.to_datetime(df[time_column]).dt.strftime('%H:%M')
     return df
 
-def every_ride_covered(circuit_planning, schedule):
+def every_ride_covered(circulation_planning, schedule):
     """Checks if every ride in the timetable is covered in circulation planning.
     
     Parameters: 
@@ -176,33 +166,33 @@ def every_ride_covered(circuit_planning, schedule):
     """
     schedule = schedule.rename(columns={'vertrektijd': 'starttijd'})
     
-    circuit_planning_sorted = circuit_planning.sort_values(by=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']).reset_index(drop=True)
+    circulation_planning_sorted = circulation_planning.sort_values(by=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']).reset_index(drop=True)
     schedule_sorted = schedule.sort_values(by=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']).reset_index(drop=True)
     
-    difference_circuit_to_schedule = circuit_planning_sorted.merge(
+    difference_circulation_to_schedule = circulation_planning_sorted.merge(
         schedule_sorted, on=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn'], how='outer', indicator=True
     ).query('_merge == "left_only"')
 
-    difference_schedule_to_circuit = circuit_planning_sorted.merge(
+    difference_schedule_to_circulation = circulation_planning_sorted.merge(
         schedule_sorted, on=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn'], how='outer', indicator=True
     ).query('_merge == "right_only"')
 
-    if not difference_circuit_to_schedule.empty:
-        print("Rows only contained in circuit planning:\n", difference_circuit_to_schedule)
-    if not difference_schedule_to_circuit.empty:
-        print("Rows only contained in schedule:\n", difference_schedule_to_circuit)
+    if not difference_circulation_to_schedule.empty:
+        print("Rows only contained in circulation planning:\n", difference_circulation_to_schedule)
+    if not difference_schedule_to_circulation.empty:
+        print("Rows only contained in schedule:\n", difference_schedule_to_circulation)
 
-    if difference_circuit_to_schedule.empty and difference_schedule_to_circuit.empty:
-        return "Circuit planning is equal to timetable"
+    if difference_circulation_to_schedule.empty and difference_schedule_to_circulation.empty:
+        return "Circulation planning is equal to timetable"
        
-circuit_planning = driven_rides(circuit_planning)
-circuit_planning = normalize_time_format(circuit_planning, "starttijd")
+circulation_planning = driven_rides(circulation_planning)
+circulation_planning = normalize_time_format(circulation_planning, "starttijd")
 
-result = every_ride_covered(circuit_planning, schedule)
+result = every_ride_covered(circulation_planning, schedule)
 
 print(result)
 
-def check_travel_time(circuit_planning, distance_matrix):
+def check_travel_time(circulation_planning, distance_matrix):
     """
     Controleert of het tijdsverschil tussen de starttijd en eindtijd in circulation_planning
     binnen de minimale en maximale reistijd in distance_matrix ligt, terwijl startlocatie,
@@ -218,15 +208,15 @@ def check_travel_time(circuit_planning, distance_matrix):
     Meldingen voor rijen die niet binnen de reistijd vallen.
     """
     # Zorg ervoor dat starttijd en eindtijd datetime zijn
-    circuit_planning['starttijd'] = pd.to_datetime(circuit_planning['starttijd'], format='%H:%M:%S', errors='coerce')
-    circuit_planning['eindtijd'] = pd.to_datetime(circuit_planning['eindtijd'], format='%H:%M:%S', errors='coerce')
+    circulation_planning['starttijd'] = pd.to_datetime(circulation_planning['starttijd'], format='%H:%M:%S', errors='coerce')
+    circulation_planning['eindtijd'] = pd.to_datetime(circulation_planning['eindtijd'], format='%H:%M:%S', errors='coerce')
 
     # Bereken het verschil in minuten
-    circuit_planning['verschil_in_minuten'] = (circuit_planning['eindtijd'] - circuit_planning['starttijd']).dt.total_seconds() / 60
+    circulation_planning['verschil_in_minuten'] = (circulation_planning['eindtijd'] - circulation_planning['starttijd']).dt.total_seconds() / 60
 
     # Merge beide datasets op 'startlocatie', 'eindlocatie' en 'buslijn'
     merged_df = pd.merge(
-        circuit_planning,
+        circulation_planning,
         distance_matrix,
         on=['startlocatie', 'eindlocatie', 'buslijn'],
         how='inner'  # Alleen gemeenschappelijke rijen behouden
@@ -238,12 +228,12 @@ def check_travel_time(circuit_planning, distance_matrix):
             print(f"Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
         
 # Voorbeeld aanroepen met omloopplanning2 en afstandsmatrix
-circuit_planning_2 = pd.read_excel('omloopplanning.xlsx')  # Zorg ervoor dat deze bestaat
+circulation_planning_2 = pd.read_excel('omloopplanning.xlsx')  # Zorg ervoor dat deze bestaat
 
 # Functie aanroepen
-check_travel_time(circuit_planning_2, distance_matrix)
+check_travel_time(circulation_planning_2, distance_matrix)
 
-def remove_startingtime_endtime_equal(circuit_planning): 
+def remove_startingtime_endtime_equal(circulation_planning): 
     """ If the starting time and end time are equal, than the row is being removed
     Parameters: 
         circulation_planning: DataFrame
@@ -251,7 +241,7 @@ def remove_startingtime_endtime_equal(circuit_planning):
     Output: DataFrame
         Clean DataFrame
     """
-    clean_circuit_planning = circuit_planning[circuit_planning['starttijd'] != circuit_planning['eindtijd']]
-    return clean_circuit_planning
+    clean_circulation_planning = circulation_planning[circulation_planning['starttijd'] != circulation_planning['eindtijd']]
+    return clean_circulation_planning
 
-new_planning = remove_startingtime_endtime_equal(circuit_planning)
+new_planning = remove_startingtime_endtime_equal(circulation_planning)
