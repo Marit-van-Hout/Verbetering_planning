@@ -124,7 +124,7 @@ end_time = datetime.strptime('00:00', '%H:%M')
 simulate_battery(circuit_planning, actual_capacity, starting_time, end_time)
 check_route_continuity(circuit_planning)
 
-st.title("🎈 Oploopschema Validatie App")
+st.title("🚌 Oploopschema Validatie App")
 st.write(
     "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema.)."
 ) 
