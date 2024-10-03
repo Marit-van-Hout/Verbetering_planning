@@ -18,7 +18,6 @@ daytime_limit = actual_capacity_90 *0.9
 consumption_per_km = (0.7+2.5)/2 # kWh per km
 min_idle_time = 15
 
-
 # Data Preparation
 distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
 distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60

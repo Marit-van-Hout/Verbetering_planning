@@ -9,12 +9,10 @@ from synthesizing import charging
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
 
-circulation_planning = pd.read_excel('omloopplanning.xlsx')
-
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
 charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 / 60 # kwh per minuut bij oladen tot 10%
+charging_time_10 = 60 / 60 # kwh per minuut bij opladen tot 10%
 actual_capacity_85 = max_capacity * 0.85 # (255 kWh)
 actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
 actual_capacity = [actual_capacity_85, actual_capacity_95]
