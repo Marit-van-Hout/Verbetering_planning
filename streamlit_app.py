@@ -5,19 +5,19 @@ import statsmodels.api as sm
 from io import StringIO
 from datetime import datetime, timedelta
 
-# we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
-# Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
-# 
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
+# We are creating an app that checks a trip schedule and verifies if it meets all constraints. 
+# If not, an error will be shown saying: Sorry, but your stupid file doesn't work. Here's why: .... What an idiot.
+
+circuit_planning = pd.read_excel('trip_schedule.xlsx')
 
 # Parameters
-max_capacity = 300 # maximale capaciteit in kWH
-SOH = [85, 95] # State of Health
-charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 / 60 # kwh per minuut bij opladen van 90% tot 100%
+max_capacity = 300  # Maximum capacity in kWh
+SOH = [85, 95]  # State of Health
+charging_speed_90 = 450 / 60  # kWh per minute for charging up to 90%
+charging_time_10 = 60 / 60  # kWh per minute for charging from 90% to 100%
 actual_capacity = max_capacity * 0.9
-daytime_limit = actual_capacity *0.9
-consumption_per_km = (0.7+2.5)/2 # kWh per km
+daytime_limit = actual_capacity * 0.9
+consumption_per_km = (0.7 + 2.5) / 2  # kWh per km
 min_idle_time = 15
 
 # Battery charging simulation
@@ -37,155 +37,145 @@ def charging(battery, actual_capacity, current_time, start_time, end_time):
     new_battery = battery + charged_energy if battery <= min_battery else battery
     return min(new_battery, max_battery)
 
-# Functie om batterijstatus te berekenen
+# Function to calculate battery status
 def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
     """
-    Simuleer de batterijstatus gedurende de omloopplanning.
+    Simulate the battery status during the trip schedule.
     Parameters:
-        - circuit_planning: DataFrame met de omloopplanning.
-        - actual_capacity: Batterijcapaciteit van de bus.
-        - start_time: Eerste vertrektijd van de dienst.
-        - end_time: Laatste eindtijd van de dienst.
-    Output: Batterijpercentage na de simulatie.
+        - circuit_planning: DataFrame with the trip schedule.
+        - actual_capacity: Battery capacity of the bus.
+        - start_time: First departure time of the regular trip.
+        - end_time: Last end time of the regular trip.
+    Output: Battery percentage after the simulation.
     """
-    battery = actual_capacity * 0.9  # Begin met 90% batterij
-    min_battery = actual_capacity * 0.1  # Minimum batterijpercentage
-    max_battery_day = actual_capacity * 0.9  # Maximaal 90% overdag
-    max_battery_night = actual_capacity  # Maximaal 100% 's nachts
-    min_charging_time = 15  # Minimaal 15 minuten opladen
+    battery = actual_capacity * 0.9  # Start with 90% battery
+    min_battery = actual_capacity * 0.1  # Minimum battery percentage
+    max_battery_day = actual_capacity * 0.9  # Maximum 90% during the day
+    max_battery_night = actual_capacity  # Maximum 100% at night
+    min_charging_time = 15  # Minimum 15 minutes of charging
 
     for i, row in circuit_planning.iterrows():
-        # Converteer start en eindtijden naar datetime
+        # Convert start and end times to datetime
         start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
         end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
 
-        # Controleer of de rit een dienst of materiaalrit is
+        # Check if the trip is a regular trip or deadhead trip
         if row['activiteit'] in ['dienst rit', 'materiaal rit']:
             consumption = row['energieverbruik']
             battery -= consumption
 
-         # Controleer of de batterijstatus onder 10% is gekomen
+            # Check if battery status has dropped below 10%
             if battery < min_battery:
-                print(f"Warning: Battery too low after route {row['buslijn']} at {row['starttijd']} from {row['startlocatie']} to {row['eindlocatie']}.")
+                print(f"Warning: Battery too low after trip {row['buslijn']} at {row['starttijd']} from {row['startlocatie']} to {row['eindlocatie']}.")
                 return battery  # Stop simulation if battery is too low
 
-        # Controleer of de bus idle is en genoeg tijd heeft om op te laden
+        # Check if the bus is idle and has enough time to charge
         if row['activiteit'] == 'opladen':
             idle_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
             idle_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
-            idle_time = (idle_end_time - idle_start_time).total_seconds() / 60  # Idle tijd in minuten
+            idle_time = (idle_end_time - idle_start_time).total_seconds() / 60  # Idle time in minutes
 
-            # Controleer of de idle tijd minstens 15 minuten is
+            # Check if the idle time is at least 15 minutes
             if idle_time >= min_charging_time:
                 battery = charging(battery, actual_capacity, idle_start_time, start_time, end_time)
             else:
-                print(f"Warning: Charging time too short at Ehvgar from {row['starttijd']} to {row['eindtijd']}, only {idle_time} minutes.")
-        
-        # Check batterijstatus na elke stap
+                print(f"Warning: Charging time too short from {row['startlocatie']} to {row['eindlocatie']} at {row['starttijd']} to {row['eindtijd']}, only {idle_time} minutes.")
+
+        # Check battery status after each step
         if battery < min_battery:
             print(f"Warning: Battery too low after {row['starttijd']}.")
             break
 
     return battery
 
-
-# Functie om routecontinuïteit te controleren
+# Function to check route continuity
 def check_route_continuity(circuit_planning):
     """
-    Controleer of het eindpunt van route n overeenkomt met het startpunt van route n+1.
+    Check if the endpoint of trip n matches the start point of trip n+1.
     Parameters:
-        - circuit_planning: DataFrame met routegegevens.
-    Output: Print meldingen als er inconsistenties zijn.
+        - circuit_planning: DataFrame with trip data.
+    Output: Print messages if there are inconsistencies.
     """
     for i in range(len(circuit_planning) - 1):
         current_end_location = circuit_planning.iloc[i]['eindlocatie']
-        next_start_location = circuit_planning.iloc[i+1]['startlocatie']
+        next_start_location = circuit_planning.iloc[i + 1]['startlocatie']
         if current_end_location != next_start_location:
-            print(f"Warning: Route continuity issue between {circuit_planning.iloc[i]['buslijn']} ending at {current_end_location} and next route starting at {next_start_location}.")
+            print(f"Warning: Route continuity issue between {circuit_planning.iloc[i]['buslijn']} ending at {current_end_location} and next trip starting at {next_start_location}.")
             return False
     return True
 
-st.title("🚌 Oploopschema Validatie App")
+st.title("🚌 Bus Planning Checker")
 st.write(
-    "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema.)."
-) 
+    "Instantly validate your circulation planning for compliance!"
+)
 
-# Bestand uploaden (CSV of Excel)
-uploaded_file = st.file_uploader("Upload je oploopschema (CSV of Excel)", type=["csv", "xlsx"])
+# File upload (CSV or Excel)
+uploaded_file = st.file_uploader("Drag and drop your circulation planning (CSV or Excel file)", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
     try:
-        # Lees het geüploade bestand (CSV of Excel)
+        # Read the uploaded file (CSV or Excel)
         if uploaded_file.name.endswith('.xlsx'):
             data = pd.read_excel(uploaded_file)
         else:
             data = pd.read_csv(uploaded_file)
         
-        st.write("**Geüpload Oploopschema:**")
+        st.write("**Your Bus Planning:**")
         st.dataframe(data)
         
-        # Validatie functie (voorbeeld)
+        # Validation function (example)
         def validate_schema(df):
             errors = []
-            # Controleer op missende waarden
+            # Check for missing values
             if data.isnull().values.any():
-                errors.append("Er zijn missende waarden in het omloopschema.")
+                errors.append("There are missing values in the bus planning.")
                 
-            # Controleer of de batterijstatus na de laatste rit boven 10% is
-            final_battery = simulate_battery(data, actual_capacity, starting_time, end_time)
+            # Check if battery status is above 10% after the last trip
+            final_battery = simulate_battery(data, actual_capacity, start_time, end_time)
             if final_battery < (actual_capacity * 0.1):
-                errors.append("De batterij is onder de 10% aan het einde van de rit.")
+                errors.append("The battery is below 10% at the end of the trip.")
             
-            # Controleer oplaadtijd
+            # Check charging time
             for i, row in data.iterrows():
                 if row['activiteit'] == 'opladen':
                     idle_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
                     idle_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
-                    idle_time = (idle_end_time - idle_start_time).total_seconds() / 60  # Idle tijd in minuten
+                    idle_time = (idle_end_time - idle_start_time).total_seconds() / 60  # Idle time in minutes
                     if idle_time < 15:
-                        errors.append(f"Oplaadtijd is te kort in rit {row['buslijn']} van {row['startlocatie']} naar {row['eindlocatie']}.")
+                        errors.append(f"Charging time is too short in trip {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
 
-            # Controleer teleportatie
+            # Check teleportation
             if data.iloc[-1]['eindlocatie'] != data.iloc[0]['startlocatie']:
-                errors.append("De eindlocatie van de laatste rit komt niet overeen met de beginlocatie van de eerste rit.")
+                errors.append("The endpoint of the last trip does not match the start location of the next trip.")
             
-            # Controleer reistijden, coverage, en idle tijd
+            # Check travel times, coverage, and idle time
             for i in range(len(data) - 1):
                 current_end_location = data.iloc[i]['eindlocatie']
                 next_start_location = data.iloc[i + 1]['startlocatie']
-                # Check of eindlocatie van de huidige rit overeenkomt met de startlocatie van de volgende rit
+                # Check if the endpoint of the current trip matches the start location of the next trip
                 if current_end_location != next_start_location:
-                    errors.append(f"Route continuïteit probleem tussen rit {data.iloc[i]['buslijn']} en {data.iloc[i + 1]['buslijn']}.")
+                    errors.append(f"Route continuity problem between trip {data.iloc[i]['buslijn']} and trip {data.iloc[i + 1]['buslijn']}.")
             
             return errors
         
-        # Voer validatie uit
+        # Perform validation
         validation_errors = validate_schema(data)
         
         if validation_errors:
-            st.error("Er zijn fouten gevonden in het oploopschema:")
+            st.error("File processed successfully. A few mistakes were found in the bus planning:")
             for error in validation_errors:
                 st.error(error)
         else:
-            st.success("Het oploopschema is geldig!")
-            
-            # Voeg een downloadknop toe voor het gevalideerde schema
-            csv = data.to_csv(index=False)
-            st.download_button(
-                label="Download gevalideerd schema als CSV",
-                data=csv,
-                file_name='gevalideerd_oploopschema.csv',
-                mime='text/csv'
-            )
-            
-            # Optionele visualisatie
-            st.write("**Visualisatie van het Oploopschema:**")
+            st.success("File processed successfully. No errors found in the bus planning.")
+                     
+            # Optional visualization
+            st.write("**Visualization of the Trip Schedule:**")
             fig, ax = plt.subplots()
             ax.scatter(data['speed'], data['energy'])
-            ax.set_xlabel('Snelheid (km/uur)')
-            ax.set_ylabel('Energieverbruik (kWh)')
-            ax.set_title('Snelheid vs Energieverbruik')
+            ax.set_xlabel('Speed (km/h)')
+            ax.set_ylabel('Energy Consumption (kWh)')
+            ax.set_title('Speed vs Energy Consumption')
             st.pyplot(fig)
     
     except Exception as e:
-        st.error(f"Er is een fout opgetreden bij het verwerken van het bestand: {str(e)}")
+        st.error(f"An error occurred while processing the file: {str(e)}")
