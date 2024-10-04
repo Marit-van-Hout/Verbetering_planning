@@ -4,34 +4,38 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from io import StringIO
 from datetime import datetime, timedelta
-from wiskundig_model import charging
 
 # we gaan een app maken die kijkt naar een omloop schema en kijkt of dit omloopschema voldoet aan alle constraints. 
 # Zo niet moet er een error komen die zecht: Sorry, maar je stomme bestand werkt niet. Dit is waarom: .... Wat ben je een sukkel
 # 
 circuit_planning = pd.read_excel('omloopplanning.xlsx')
 
+# Parameters
 max_capacity = 300 # maximale capaciteit in kWH
 SOH = [85, 95] # State of Health
 charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 / 60 # kwh per minuut bij oladen tot 10%
-actual_capacity_85 = max_capacity * 0.85 # (255 kWh)
-actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
-actual_capacity = [actual_capacity_85, actual_capacity_95]
-daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
-consumption_per_km = [0.7, 2.5] # kWh per km
+charging_time_10 = 60 / 60 # kwh per minuut bij opladen van 90% tot 100%
+actual_capacity = max_capacity * 0.9
+daytime_limit = actual_capacity *0.9
+consumption_per_km = (0.7+2.5)/2 # kWh per km
+min_idle_time = 15
 
-circuit_planning = pd.read_excel('omloopplanning.xlsx')
+# Battery charging simulation
+def charging(battery, actual_capacity, current_time, start_time, end_time):
+    """Charge the battery based on the current time and bus schedule."""
+    min_battery = 0.10 * actual_capacity
+    max_battery_day = 0.90 * actual_capacity
+    max_battery_night = actual_capacity
+    charging_per_min = charging_speed_90
 
-max_capacity = 300 # maximale capaciteit in kWH
-SOH = [85, 95] # State of Health
-charging_speed_90 = 450 / 60 # kwh per minuut bij opladen tot 90%
-charging_time_10 = 60 / 60 # kwh per minuut bij oladen tot 10%
-actual_capacity_85 = max_capacity * 0.85 # (255 kWh)
-actual_capacity_95 = max_capacity * 0.95 # (285 kWh)
-actual_capacity = [actual_capacity_85, actual_capacity_95]
-daytime_limit = [actual_capacity_85*0.9, actual_capacity_95*0.9]
-consumption_per_km = [0.7, 2.5] # kWh per km
+    if current_time < start_time or current_time > end_time:
+        max_battery = max_battery_night
+    else:
+        max_battery = max_battery_day
+
+    charged_energy = min_idle_time * charging_per_min
+    new_battery = battery + charged_energy if battery <= min_battery else battery
+    return min(new_battery, max_battery)
 
 # Functie om batterijstatus te berekenen
 def simulate_battery(circuit_planning, actual_capacity, start_time, end_time):
@@ -100,29 +104,6 @@ def check_route_continuity(circuit_planning):
             print(f"Warning: Route continuity issue between {circuit_planning.iloc[i]['buslijn']} ending at {current_end_location} and next route starting at {next_start_location}.")
             return False
     return True
-
-
-# Voorbeeld simulatie van batterijverbruik en routecontinuïteit
-actual_capacity = 285  # Capaciteit van de bus in kWh
-starting_time = datetime.strptime('06:00', '%H:%M')
-end_time = datetime.strptime('00:00', '%H:%M')
-
-# Controleer de route continuïteit
-if check_route_continuity(circuit_planning):
-    # Voer de simulatie uit
-    final_battery = simulate_battery(circuit_planning, actual_capacity, starting_time, end_time)
-    print(f"Battery status at the end of the day: {final_battery:.2f} kWh")
-else:
-    print("The circuit planning is not usable due to routing continuity problems.")
-
-# Voorbeeld data
-actual_capacity = 285  # Capaciteit van de bus
-starting_time = datetime.strptime('06:00', '%H:%M')
-end_time = datetime.strptime('00:00', '%H:%M')
-
-# Voer de simulatie uit
-simulate_battery(circuit_planning, actual_capacity, starting_time, end_time)
-check_route_continuity(circuit_planning)
 
 st.title("🚌 Oploopschema Validatie App")
 st.write(
