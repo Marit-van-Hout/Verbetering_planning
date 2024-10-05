@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import streamlit as st
+from io import StringIO
+from datetime import datetime, timedelta
+from wiskundig_model import charging
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
 
 # Load data
 uploaded_file = pd.read_excel('omloopplanning.xlsx')
@@ -18,6 +24,11 @@ daytime_limit = actual_capacity_90 * 0.9
 consumption_per_km = (0.7 + 2.5) / 2 # kWh per km
 min_idle_time = 15
 
+<<<<<<< HEAD
+errors = []
+
+=======
+>>>>>>> b9d9c38f0ed100730c9e33743dc4374d4d625726
 # Data Preparation
 distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
 distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60
@@ -76,7 +87,7 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
             consumption = row['energieverbruik']
             battery -= consumption
             if battery < min_battery:
-                print(f"Warning: Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
+                errors.append(f"Warning: Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
         
         # Check if the bus has enough time to charge
         elif row['activiteit'] == 'opladen':
@@ -86,11 +97,11 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
             if idle_time >= min_idle_time:
                 battery = charging(battery, actual_capacity, idle_start_time, start_time, end_time)
             else:
-                print(f"Warning: Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
+                errors.append(f"Warning: Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
 
         # Ensure battery remains above 10%
         if battery < min_battery:
-            print(f"Warning: Battery too low after {row['starttijd']}.")
+            errors.append(f"Warning: Battery too low after {row['starttijd']}.")
     
     return battery
 
@@ -106,7 +117,7 @@ def check_route_continuity(bus_planning):
         current_end_location = bus_planning.iloc[i]['eindlocatie']
         next_start_location = bus_planning.iloc[i + 1]['startlocatie']
         if current_end_location != next_start_location:
-            print(f"Warning: Route continuity issue between {bus_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
+            print(f"Warning: Route continuity issue between {circulation_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
             return False
            
     return True
@@ -119,13 +130,13 @@ def battery_consumption(distance, current_time, start_time, end_time):
     
     return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
 
-# Function to display which rides are driven
-def driven_rides(bus_planning):
-    """Displays which rides are driven.
-    Parameters:
-        bus_planning: DataFrame
-        The full bus planning data.
-    Output:
+# Yvonnes code
+def driven_rides(circulation_planning):
+    """ displays which rides are droven
+    Parameters
+        omloopplanning: DataFrame
+        The full circulation planning data.
+    output
         DataFrame
         A cleaned bus planning DataFrame containing only the relevant columns 
         and rows where a bus line is present.
@@ -223,7 +234,7 @@ def check_travel_time(bus_planning, distance_matrix):
     # Check if the difference is within the minimum and maximum travel time
     for index, row in merged_df.iterrows():
         if not (row['min reistijd in min'] <= row['verschil_in_minuten'] <= row['max reistijd in min']):
-            print(f"Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
+            errors.append(f"Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
         
 # Example call with bus planning 2 and distance matrix
 bus_planning_2 = pd.read_excel('omloopplanning.xlsx')  # Ensure this exists
@@ -242,4 +253,73 @@ def remove_startingtime_endtime_equal(bus_planning):
     clean_bus_planning = bus_planning[bus_planning['starttijd'] != bus_planning['eindtijd']]
     return clean_bus_planning
 
+<<<<<<< HEAD
+new_planning = remove_startingtime_endtime_equal(circuit_planning)
+
+st.title("🎈 Oploopschema Validatie App")
+st.write(
+    "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema."
+) 
+
+# Bestand uploaden (CSV of Excel)
+uploaded_file = st.file_uploader("Upload je oploopschema (CSV of Excel)", type=["csv", "xlsx"])
+
+if uploaded_file is not None:
+    try:
+        # Lees het geüploade bestand (CSV of Excel)
+        if uploaded_file.name.endswith('.xlsx'):
+            data = pd.read_excel(uploaded_file)
+        else:
+            data = pd.read_csv(uploaded_file)
+        
+        st.write("**Geüpload Oploopschema:**")
+        st.dataframe(data)
+        
+        # Validatie functie (voorbeeld)
+        def validate_schema(df):
+            calculate_end_time(row)
+            charging(battery, actual_capacity, current_time, start_time, end_time)
+            simulate_battery(circuit_planning, actual_capacity, start_time, end_time)
+            check_route_continuity(circuit_planning)
+            battery_consumption(distance, current_time, start_time, end_time)
+            check_route_continuity(circuit_planning)
+            driven_rides(circuit_planning)
+            normalize_time_format(df, time_column)
+            every_ride_covered(circuit_planning, schedule)
+            check_travel_time(circuit_planning, distance_matrix)
+            remove_startingtime_endtime_equal(circuit_planning)
+            return errors
+        
+        # Voer validatie uit
+        validation_errors = validate_schema(data)
+        
+        if validation_errors:
+            st.error("Er zijn fouten gevonden in het oploopschema:")
+            for error in validation_errors:
+                st.error(error)
+        else:
+            st.success("Het oploopschema is geldig!")
+            
+            # Voeg een downloadknop toe voor het gevalideerde schema
+            csv = data.to_csv(index=False)
+            st.download_button(
+                label="Download gevalideerd schema als CSV",
+                data=csv,
+                file_name='gevalideerd_oploopschema.csv',
+                mime='text/csv'
+            )
+            
+            # Optionele visualisatie
+            st.write("**Visualisatie van het Oploopschema:**")
+            fig, ax = plt.subplots()
+            ax.scatter(data['speed'], data['energy'])
+            ax.set_xlabel('Snelheid (km/uur)')
+            ax.set_ylabel('Energieverbruik (kWh)')
+            ax.set_title('Snelheid vs Energieverbruik')
+            st.pyplot(fig)
+    
+    except Exception as e:
+        st.error(f"Er is een fout opgetreden bij het verwerken van het bestand: {str(e)}")
+=======
 new_planning = remove_startingtime_endtime_equal(uploaded_file)
+>>>>>>> b9d9c38f0ed100730c9e33743dc4374d4d625726
