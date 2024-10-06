@@ -179,3 +179,41 @@ if uploaded_file is not None:
     
     except Exception as e:
         st.error(f"An error occurred while processing the file: {str(e)}")
+def plot_schedule(scheduled_orders):
+    """Plots a Gantt chart of the scheuled orders
+
+    Args:
+        scheduled_orders (dict): every order, their starting time, end time, on which machine and set-up time
+        method (str): method used to calculate schedule
+    """    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    y_pos = 0
+    
+    # Colors for visualization
+    color_map = {
+         '400': 'blue',
+       '401': 'yellow',
+    }
+    for machine, orders in scheduled_orders.items():
+        y_pos += 1  # Voor elke machine
+        for order in orders:
+            order_color = order['colour']
+            processing_time = order['end_time'] - order['start_time'] - order['setup_time']
+            setup_time = order['setup_time']
+            start_time = order['start_time']
+            
+            # Teken verwerkingstijd
+            ax.barh(y_pos, processing_time, left=start_time + setup_time, color=color_map[order_color], edgecolor='black')
+            ax.text(start_time + setup_time + processing_time / 2, y_pos, f"Order {order['order']}", ha='center', va='center', color='black', rotation=90)
+
+            # Teken setup tijd
+            if setup_time > 0:
+                ax.barh(y_pos, setup_time, left=start_time, color='gray', edgecolor='black', hatch='//')
+    
+    ax.set_yticks(range(1, len(scheduled_orders) + 1))
+    ax.set_yticklabels([f"Machine {m}" for m in scheduled_orders.keys()])
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Machines')
+    ax.set_title(f'Gantt Chart for Paint Shop Scheduling')
+    plt.show()

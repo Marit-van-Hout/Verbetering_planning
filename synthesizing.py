@@ -24,11 +24,10 @@ daytime_limit = actual_capacity_90 * 0.9
 consumption_per_km = (0.7 + 2.5) / 2 # kWh per km
 min_idle_time = 15
 
-<<<<<<< HEAD
+
 errors = []
 
-=======
->>>>>>> b9d9c38f0ed100730c9e33743dc4374d4d625726
+
 # Data Preparation
 distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
 distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60
@@ -193,7 +192,54 @@ def every_ride_covered(bus_planning, time_table):
 
     if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
         return "Bus planning is equal to time table"
-       
+
+
+def plot_schedule(scheduled_orders):
+    """Plots a Gantt chart of the scheduled orders
+
+    Args:
+        scheduled_orders (dict): every order, their starting time, end time, on which machine and set-up time
+    """    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    y_pos = 0
+    
+    # Colors for visualization
+    color_map = {
+         '400': 'blue',
+         '401': 'yellow',
+    }
+    
+    for machine, orders in scheduled_orders.items():
+        y_pos += 1  # Voor elke machine
+        for order in orders:
+            order_color = order['colour']
+            processing_time = order['end_time'] - order['start_time'] - order['setup_time']
+            setup_time = order['setup_time']
+            start_time = order['start_time']
+            
+            # Controleer of de kleur aanwezig is in de color_map
+            if order_color in color_map:
+                color = color_map[order_color]
+            else:
+                color = 'black'  # Default color als de kleur niet bestaat in color_map
+            
+            # Teken verwerkingstijd
+            ax.barh(y_pos, processing_time, left=start_time + setup_time, color=color, edgecolor='black')
+            ax.text(start_time + setup_time + processing_time / 2, y_pos, f"Order {order['order']}", 
+                    ha='center', va='center', color='black', rotation=90)
+
+            # Teken setup tijd
+            if setup_time > 0:
+                ax.barh(y_pos, setup_time, left=start_time, color='gray', edgecolor='black', hatch='//')
+    
+    ax.set_yticks(range(1, len(scheduled_orders) + 1))
+    ax.set_yticklabels([f"Machine {m}" for m in scheduled_orders.keys()])
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Machines')
+    ax.set_title('Gantt Chart for Paint Shop Scheduling')
+    plt.show()
+          
 uploaded_file = driven_rides(uploaded_file)
 uploaded_file = normalize_time_format(uploaded_file, "starttijd")
 
@@ -253,7 +299,7 @@ def remove_startingtime_endtime_equal(bus_planning):
     clean_bus_planning = bus_planning[bus_planning['starttijd'] != bus_planning['eindtijd']]
     return clean_bus_planning
 
-<<<<<<< HEAD
+
 new_planning = remove_startingtime_endtime_equal(circuit_planning)
 
 st.title("🎈 Oploopschema Validatie App")
@@ -288,6 +334,7 @@ if uploaded_file is not None:
             every_ride_covered(circuit_planning, schedule)
             check_travel_time(circuit_planning, distance_matrix)
             remove_startingtime_endtime_equal(circuit_planning)
+            plot_schedule(scheduled_orders)
             return errors
         
         # Voer validatie uit
@@ -320,6 +367,8 @@ if uploaded_file is not None:
     
     except Exception as e:
         st.error(f"Er is een fout opgetreden bij het verwerken van het bestand: {str(e)}")
-=======
+
 new_planning = remove_startingtime_endtime_equal(uploaded_file)
->>>>>>> b9d9c38f0ed100730c9e33743dc4374d4d625726
+
+
+
