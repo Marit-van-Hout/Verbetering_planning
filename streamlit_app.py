@@ -182,6 +182,7 @@ if uploaded_file is not None:
         validation_errors = validate_schema(data)
         
         if validation_errors:
+            
             st.error("Er zijn fouten gevonden in het oploopschema:")
             for error in validation_errors:
                 st.error(error)
