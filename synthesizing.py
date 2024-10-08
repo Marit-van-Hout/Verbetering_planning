@@ -36,6 +36,8 @@ distance_matrix["buslijn"] = distance_matrix["buslijn"].fillna("deadhead trip")
 distance_matrix["max_energy"] = distance_matrix["afstand in km"] * 2.5
 distance_matrix["min_energy"] = distance_matrix["afstand in km"] * 0.7
 
+time_table['Row_Number'] = time_table.index + 1
+
 time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetime.strptime(x, '%H:%M'))
 
 def calculate_end_time(row):
@@ -53,23 +55,6 @@ def calculate_end_time(row):
         return None
 
 time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
-
-# Battery charging simulation
-def charging(battery, actual_capacity, current_time, start_time, end_time):
-    """Charge the battery based on the current time and time table."""
-    min_battery = 0.10 * actual_capacity
-    max_battery_day = 0.90 * actual_capacity
-    max_battery_night = actual_capacity
-    charging_per_min = charging_speed_90
-
-    if current_time < start_time or current_time > end_time:
-        max_battery = max_battery_night
-    else:
-        max_battery = max_battery_day
-
-    charged_energy = min_idle_time * charging_per_min
-    new_battery = battery + charged_energy if battery <= min_battery else battery
-    return min(new_battery, max_battery)
 
 def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
     """Simulate battery usage throughout the day based on the bus planning."""
@@ -103,6 +88,23 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
             errors.append(f"Warning: Battery too low after {row['starttijd']}.")
     
     return battery
+
+# Battery charging simulation
+def charging(battery, actual_capacity, current_time, start_time, end_time):
+    """Charge the battery based on the current time and time table."""
+    min_battery = 0.10 * actual_capacity
+    max_battery_day = 0.90 * actual_capacity
+    max_battery_night = actual_capacity
+    charging_per_min = charging_speed_90
+
+    if current_time < start_time or current_time > end_time:
+        max_battery = max_battery_night
+    else:
+        max_battery = max_battery_day
+
+    charged_energy = min_idle_time * charging_per_min
+    new_battery = battery + charged_energy if battery <= min_battery else battery
+    return min(new_battery, max_battery)
 
 # Function to check route continuity
 def check_route_continuity(bus_planning):
@@ -320,21 +322,12 @@ if uploaded_file is not None:
         
         st.write("**Geüpload Oploopschema:**")
         st.dataframe(data)
-        
+    
         # Validatie functie (voorbeeld)
         def validate_schema(df):
-            calculate_end_time(row)
+            end_time = calculate_end_time(time_table['Row_Number']) # berekend end_time
+            battery = simulate_battery(uploaded_file, actual_capacity, time_table['vertrektijd'], end_time)
             charging(battery, actual_capacity, current_time, start_time, end_time)
-            simulate_battery(circuit_planning, actual_capacity, start_time, end_time)
-            check_route_continuity(circuit_planning)
-            battery_consumption(distance, current_time, start_time, end_time)
-            check_route_continuity(circuit_planning)
-            driven_rides(circuit_planning)
-            normalize_time_format(df, time_column)
-            every_ride_covered(circuit_planning, schedule)
-            check_travel_time(circuit_planning, distance_matrix)
-            remove_startingtime_endtime_equal(circuit_planning)
-            plot_schedule(scheduled_orders)
             return errors
         
         # Voer validatie uit
