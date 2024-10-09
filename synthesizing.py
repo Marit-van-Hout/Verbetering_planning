@@ -40,6 +40,8 @@ time_table['Row_Number'] = time_table.index + 1
 
 time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetime.strptime(x, '%H:%M'))
 
+# fleur: ik denk dat dit een fout is geweest maar moet dit niet gebaseerd zijn op de "max reistijd in min" en niet de "min reistijd in min"
+# fleur: is het niet handiger als we de mean ervan nemen en die opstellen als de normale "end_time"
 def calculate_end_time(row):
     """ Adds the maximum travel time to the departure time to create a column with end time.
     Parameters: row
@@ -89,9 +91,141 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
     
     return battery
 
+# Probeer de conversie opnieuw
+time_table["vertrektijd"] = pd.to_datetime(time_table["vertrektijd"], format='%H:%M', errors='coerce')
+
+# fleurs probeersel van een starttijd van de dag
+start_tijden = []
+
+def Start_day(line):
+    """
+    Deze functie kijkt naar de kolom 'startlocatie' in time_table. 
+    Voor elke lijn wordt de tijd van een rit met materiaal (buslijn = NaN) vanuit 'ehvgar' 
+    naar de startlocatie bepaald voor beide startlocaties ('ehvapt' en 'ehvbst').
+    
+    input: de lijn waarvoor de starttijden worden berekend (bijv. 400 of 401).
+    output: de berekende starttijden worden toegevoegd aan de lijst start_tijden.
+    """
+    if line in time_table["buslijn"].values:
+        # Verkrijg de startlocaties van de buslijn
+        start_locaties = time_table.loc[time_table["buslijn"] == line, "startlocatie"].unique()
+
+        for start_locatie in start_locaties:
+            if start_locatie in ["ehvapt", "ehvbst"]:
+                # Maak een mask om de juiste rij uit de distance_matrix te filteren
+                mask = (
+                    (distance_matrix["eindlocatie"] == start_locatie) &
+                    (distance_matrix["startlocatie"] == "ehvgar") &
+                    (distance_matrix["buslijn"].isna())
+                )
+                # Controleer of er resultaten zijn
+                if not distance_matrix[mask].empty:
+                    # Verkrijg de reistijd
+                    reistijd = distance_matrix.loc[mask, "min reistijd in min"].iloc[0]
+                    # Converteer reistijd naar een Timedelta in minuten
+                    reistijd_delta = pd.Timedelta(minutes=reistijd)
+
+                    # Bereken de starttijd van de dag
+                    start_day = time_table.loc[time_table["buslijn"] == line, "vertrektijd"].iloc[0] - reistijd_delta
+                    
+                    # Voeg de starttijd toe aan de lijst
+                    start_tijden.append((line, start_locatie, start_day))  # Voeg lijn en locatie toe
+                else:
+                    errors.append("Geen matchende rit gevonden van 'ehvgar' naar", start_locatie)
+            else:
+                errors.append("Startlocatie niet herkend:", start_locatie)
+    else:
+        errors.append("Geen ritten gevonden voor buslijn", line)
+
+# Roep de functie aan voor beide buslijnen
+Start_day(400)
+Start_day(401)
+
+# Toon de starttijden
+print("Starttijden van de dag:", start_tijden)
+
+distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
+time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
+
+# fleurs probeersel van een eindtijden van de dag
+import pandas as pd
+
+eind_tijden = []
+
+def eind_dag(line):
+    """
+    Deze functie berekent de eindtijden van de dag voor een bepaalde buslijn, vanuit zowel 'ehvapt' als 'ehvbst'.
+    Voor beide locaties wordt de laatste vertrektijd genomen en gecombineerd met de reistijd naar 'ehvgar' uit de distance_matrix.
+    
+    input: de lijn waarvoor de eindtijden worden berekend (bijv. 400 of 401)
+    output: de berekende eindtijden worden toegevoegd aan de lijst eind_tijden.
+    """
+    if line in time_table["buslijn"].values:
+        # Controleer beide locaties: 'ehvapt' en 'ehvbst'
+        for locatie in ["ehvapt", "ehvbst"]:
+            # Filter de laatste rit vanuit de huidige locatie
+            mask = (time_table["buslijn"] == line) & (time_table["eindlocatie"] == locatie)
+            if not time_table[mask].empty:
+                laatste_rit = time_table[mask].iloc[-1]
+                eind_vertrektijd = laatste_rit["vertrektijd"]
+
+                # Zoek de reistijd naar 'ehvgar' in de distance_matrix
+                reistijd_mask = (
+                    (distance_matrix["startlocatie"] == locatie) &
+                    (distance_matrix["eindlocatie"] == "ehvgar") &
+                    (distance_matrix["buslijn"].isna())
+                )
+                
+                if not distance_matrix[reistijd_mask].empty:
+                    # Verkrijg de reistijd en bereken de eindtijd
+                    reistijd = distance_matrix.loc[reistijd_mask, "min reistijd in min"].iloc[0]
+                    reistijd_delta = pd.Timedelta(minutes=reistijd)
+                    eind_dag_tijd = eind_vertrektijd + reistijd_delta
+                    
+                    # Voeg de eindtijd toe aan de lijst met de locatie vermeld
+                    eind_tijden.append((line, locatie, eind_dag_tijd))
+                else:
+                    errors.append(f"Geen matchende rit gevonden van {locatie} naar 'ehvgar' voor lijn {line}")
+            else:
+                errors.append(f"Geen ritten gevonden voor buslijn {line} met eindlocatie {locatie}")
+    else:
+        errors.append("Geen ritten gevonden voor buslijn", line)
+
+# Roep de functie aan voor beide buslijnen
+eind_dag(400)
+eind_dag(401)
+
+# Toon de eindtijden
+print("Eindtijden van de dag:", eind_tijden)
+
+# Fleurs creatie. Misshien was het niet gevraagd maar ja
+def current_time(time_table):
+    """
+    Deze functie houdt bij waar we zijn in het schema en laat de tijd zien.
+    Input: 
+        time_table: DataFrame met de dienstregeling, inclusief vertrektijden en eindtijden.
+    Output: 
+        current_time: De huidige tijd in het schema.
+    """
+    # Huidige tijd instellen op het moment dat de functie wordt aangeroepen
+    now = datetime.now().time()
+
+    # Zoek de eerste vertrektijd die groter is dan of gelijk aan de huidige tijd
+    for index, row in time_table.iterrows():
+        departure_time = row['vertrektijd_dt'].time() 
+        if departure_time >= now:
+            return departure_time  # Geef de eerstvolgende vertrektijd terug
+
+    # Als er geen vertrektijd meer is, geef dan de laatste vertrektijd terug
+    return time_table['vertrektijd_dt'].iloc[-1].time()
+
+# Voorbeeld van het gebruik van de current_time functie
+huidige_tijd = current_time(time_table)
+print("Huidige tijd in het schema:", huidige_tijd)
+
 # Battery charging simulation
-def charging(battery, actual_capacity, current_time, start_time, end_time):
-    """Charge the battery based on the current time and time table."""
+def charging(battery, actual_capacity, current_time, start_time, end_time): # dit werkt niet als we niet de echte begintijd en eindtijd van de dag hebben.
+    """Charge the battery based on the current time and time table.""" # ook hebben we geen funtie die de current_time bijhoud.
     min_battery = 0.10 * actual_capacity
     max_battery_day = 0.90 * actual_capacity
     max_battery_night = actual_capacity
@@ -106,8 +240,115 @@ def charging(battery, actual_capacity, current_time, start_time, end_time):
     new_battery = battery + charged_energy if battery <= min_battery else battery
     return min(new_battery, max_battery)
 
+# fleurs creatie: ik zou het niet vertrouwen 
+def charging(battery, actual_capacity, current_time, start_times, end_times):
+    """
+    Simuleert het opladen van de batterij op basis van de huidige tijd en start- en eindtijden van de dienstregeling.
+    
+    Parameters:
+        battery (float): Huidige batterijcapaciteit.
+        actual_capacity (float): Totale capaciteit van de batterij.
+        current_time (datetime.time): Huidige tijd in het schema.
+        start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
+        end_times (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
+    
+    Returns:
+        float: Nieuwe batterijcapaciteit na opladen.
+        
+    Raises:
+        ValueError: Als er geen geldige start- of eindtijd wordt gevonden voor de huidige tijd.
+    """
+    
+    min_battery = 0.10 * actual_capacity
+    max_battery_day = 0.90 * actual_capacity
+    max_battery_night = actual_capacity
+    charging_per_min = charging_speed_90
+    
+    # Zoek de juiste starttijd
+    start_time = None
+    for line, locatie, tijd in start_times:
+        if current_time >= tijd.time():
+            start_time = tijd
+    
+    # Zoek de juiste eindtijd
+    end_time = None
+    for line, locatie, tijd in end_times:
+        if current_time >= tijd.time():
+            end_time = tijd
+    
+    # Controleer of start_time en end_time zijn gevonden
+    if start_time is None:
+        raise ValueError(f"Geen geldige starttijd gevonden voor de huidige tijd: {current_time}")
+    if end_time is None:
+        raise ValueError(f"Geen geldige eindtijd gevonden voor de huidige tijd: {current_time}")
+    
+    # Bepaal maximum batterijlimiet op basis van de tijd
+    if current_time < start_time.time() or current_time > end_time.time():
+        max_battery = max_battery_night
+    else:
+        max_battery = max_battery_day
+
+    # Bereken de nieuwe batterijcapaciteit
+    charged_energy = min_idle_time * charging_per_min
+    new_battery = battery + charged_energy if battery <= min_battery else battery
+    return min(new_battery, max_battery)
+
+# fleurs creatie: ik zou deze ook niet vertrouwen
+def battery_consumption(distance, current_time, start_times, end_times):
+    """
+    Bereken het batterijverbruik op basis van de afstand en huidige tijd.
+    
+    Parameters:
+        distance (float): Afstand in kilometers.
+        current_time (datetime.time): Huidige tijd in het schema.
+        start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
+        end_times (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
+    
+    Returns:
+        float: Resterende batterijcapaciteit na verbruik en opladen.
+        
+    Raises:
+        ValueError: Als er geen geldige start- of eindtijd wordt gevonden voor de huidige tijd.
+    """
+    
+    # Bepaal batterijcapaciteit voor de dag
+    battery_capacity = max_capacity * 0.9
+    
+    # Bereken het verbruik op basis van de afstand
+    consumption = distance * np.mean(consumption_per_km)
+    remaining_battery = battery_capacity - consumption
+    
+    # Zoek de juiste starttijd
+    start_time = None
+    for line, locatie, tijd in start_times:
+        if current_time >= tijd.time():
+            start_time = tijd
+    
+    # Zoek de juiste eindtijd
+    end_time = None
+    for line, locatie, tijd in end_times:
+        if current_time >= tijd.time():
+            end_time = tijd
+    
+    # Controleer of start_time en end_time zijn gevonden
+    if start_time is None:
+        raise ValueError(f"Geen geldige starttijd gevonden voor de huidige tijd: {current_time}")
+    if end_time is None:
+        raise ValueError(f"Geen geldige eindtijd gevonden voor de huidige tijd: {current_time}")
+    
+    # Roep de charging-functie aan om het resterende batterijpercentage bij te werken
+    return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
+
+def battery_consumption(distance, current_time, start_time, end_time): # hier geld precies hetzelfde.
+    """Calculate battery consumption based on distance and time."""
+    battery_capacity = max_capacity * 0.9
+    consumption = distance * np.mean(consumption_per_km)
+    remaining_battery = battery_capacity - consumption
+    
+    return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
+
 # Function to check route continuity
-def check_route_continuity(bus_planning):
+def check_route_continuity(bus_planning): # de bus kan niet vliegen
     """
     Check if the endpoint of route n matches the start point of route n+1.
     Parameters:
@@ -118,21 +359,13 @@ def check_route_continuity(bus_planning):
         current_end_location = bus_planning.iloc[i]['eindlocatie']
         next_start_location = bus_planning.iloc[i + 1]['startlocatie']
         if current_end_location != next_start_location:
-            print(f"Warning: Route continuity issue between {circulation_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
+            errors.append(f"Warning: Route continuity issue between {bus_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.")
             return False
            
     return True
 
-def battery_consumption(distance, current_time, start_time, end_time):
-    """Calculate battery consumption based on distance and time."""
-    battery_capacity = max_capacity * 0.9
-    consumption = distance * np.mean(consumption_per_km)
-    remaining_battery = battery_capacity - consumption
-    
-    return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
-
 # Yvonnes code
-def driven_rides(circulation_planning):
+def driven_rides(bus_planning):
     """ displays which rides are droven
     Parameters
         omloopplanning: DataFrame
@@ -188,9 +421,9 @@ def every_ride_covered(bus_planning, time_table):
     ).query('_merge == "right_only"')
 
     if not difference_bus_planning_to_time_table.empty:
-        print("Rows only contained in bus planning:\n", difference_bus_planning_to_time_table)
+        errors.append("Rows only contained in bus planning:\n", difference_bus_planning_to_time_table)
     if not difference_time_table_to_bus_planning.empty:
-        print("Rows only contained in time table:\n", difference_time_table_to_bus_planning)
+        errors.append("Rows only contained in time table:\n", difference_time_table_to_bus_planning)
 
     if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
         return "Bus planning is equal to time table"
@@ -302,7 +535,7 @@ def remove_startingtime_endtime_equal(bus_planning):
     return clean_bus_planning
 
 
-new_planning = remove_startingtime_endtime_equal(circuit_planning)
+new_planning = remove_startingtime_endtime_equal(bus_planning)
 
 st.title("🎈 Oploopschema Validatie App")
 st.write(
@@ -328,6 +561,7 @@ if uploaded_file is not None:
             end_time = calculate_end_time(time_table['Row_Number']) # berekend end_time
             battery = simulate_battery(uploaded_file, actual_capacity, time_table['vertrektijd'], end_time)
             charging(battery, actual_capacity, current_time, start_time, end_time)
+
             return errors
         
         # Voer validatie uit
