@@ -131,7 +131,8 @@ def Start_day(line):
                     # Voeg de starttijd toe aan de lijst
                     start_tijden.append((line, start_locatie, start_day))  # Voeg lijn en locatie toe
                 else:
-                    errors.append("Geen matchende rit gevonden van 'ehvgar' naar", start_locatie)
+                    errors.append(f"Geen matchende rit gevonden van 'ehvgar' naar {start_locatie}")
+
             else:
                 errors.append("Startlocatie niet herkend:", start_locatie)
     else:
@@ -144,19 +145,17 @@ Start_day(401)
 # Toon de starttijden
 print("Starttijden van de dag:", start_tijden)
 
-distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
-time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
-
 # fleurs probeersel van een eindtijden van de dag
 import pandas as pd
 
+# Lijst om de eindtijden op te slaan
 eind_tijden = []
 
 def eind_dag(line):
     """
     Deze functie berekent de eindtijden van de dag voor een bepaalde buslijn, vanuit zowel 'ehvapt' als 'ehvbst'.
     Voor beide locaties wordt de laatste vertrektijd genomen en gecombineerd met de reistijd naar 'ehvgar' uit de distance_matrix.
-    
+
     input: de lijn waarvoor de eindtijden worden berekend (bijv. 400 of 401)
     output: de berekende eindtijden worden toegevoegd aan de lijst eind_tijden.
     """
@@ -168,6 +167,9 @@ def eind_dag(line):
             if not time_table[mask].empty:
                 laatste_rit = time_table[mask].iloc[-1]
                 eind_vertrektijd = laatste_rit["vertrektijd"]
+
+                # Zorg ervoor dat eind_vertrektijd een datetime object is
+                eind_vertrektijd = pd.to_datetime(eind_vertrektijd)
 
                 # Zoek de reistijd naar 'ehvgar' in de distance_matrix
                 reistijd_mask = (
@@ -189,14 +191,17 @@ def eind_dag(line):
             else:
                 errors.append(f"Geen ritten gevonden voor buslijn {line} met eindlocatie {locatie}")
     else:
-        errors.append("Geen ritten gevonden voor buslijn", line)
+        errors.append(f"Geen ritten gevonden voor buslijn {line}")
 
 # Roep de functie aan voor beide buslijnen
 eind_dag(400)
 eind_dag(401)
 
-# Toon de eindtijden
+# Toon de eindtijden en eventuele fouten
 print("Eindtijden van de dag:", eind_tijden)
+if errors:
+    print("Fouten:", errors)
+
 
 # Fleurs creatie. Misshien was het niet gevraagd maar ja
 def current_time(time_table):
@@ -535,12 +540,144 @@ def remove_startingtime_endtime_equal(bus_planning):
     return clean_bus_planning
 
 
-new_planning = remove_startingtime_endtime_equal(bus_planning)
+#new_planning = remove_startingtime_endtime_equal(bus_planning)
 
 st.title("🎈 Oploopschema Validatie App")
 st.write(
     "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema."
 ) 
+
+def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, start_times, end_times, 
+                   distance, bus_planning, df, time_column, scheduled_orders, distance_matrix) -> list[str]:
+    """
+    Valideert het schema van een busplanning.
+
+    Parameters:
+    - row: Een dictionary met de gegevens van de rit.
+    - time_table: Een DataFrame met vertrektijden en andere relevante informatie.
+    - uploaded_file, actual_capacity, start_times, end_times: Vereiste parameters voor de simulatie en batterijfuncties.
+    - distance: Afstand voor batterijverbruik.
+    - bus_planning: De planning van de bus.
+    - df, time_column: DataFrame en tijdkolom voor normalisatie.
+    - scheduled_orders: Geplande orders voor plotting.
+    - distance_matrix: Matrix voor reistijdcontrole.
+
+    Returns:
+    - Een lijst van foutmeldingen die zijn opgetreden tijdens de validatie.
+    """
+    errors = []
+
+    def calculate_end_time(row):
+        # Implementatie van de functie
+        pass
+
+    def current_time(time_table):
+        # Implementatie van de functie
+        pass
+
+    def simulate_battery(uploaded_file, actual_capacity, departure_time, end_time):
+        # Implementatie van de functie
+        pass
+
+    def charging(battery, actual_capacity, current_time_val, start_times, end_times):
+        # Implementatie van de functie
+        pass
+
+    def battery_consumption(distance, current_time_val, start_times, end_times):
+        # Implementatie van de functie
+        pass
+
+    def check_route_continuity(bus_planning):
+        # Implementatie van de functie
+        pass
+
+    def driven_rides(bus_planning):
+        # Implementatie van de functie
+        pass
+
+    def normalize_time_format(df, time_column):
+        # Implementatie van de functie
+        pass
+
+    def every_ride_covered(bus_planning, time_table):
+        # Implementatie van de functie
+        pass
+
+    def plot_schedule(scheduled_orders):
+        # Implementatie van de functie
+        pass
+
+    def check_travel_time(bus_planning, distance_matrix):
+        # Implementatie van de functie
+        pass
+
+    def remove_startingtime_endtime_equal(bus_planning):
+        # Implementatie van de functie
+        pass
+
+    # De validatiefuncties aanroepen
+    try:
+        end_time = calculate_end_time(row)
+    except Exception as e:
+        errors.append(f"Fout bij berekenen van eindtijd: {str(e)}")
+    
+    try:
+        current_time_val = current_time(time_table)
+    except Exception as e:
+        errors.append(f"Fout bij ophalen van huidige tijd: {str(e)}")
+    
+    try:
+        battery = simulate_battery(uploaded_file, actual_capacity, time_table['vertrektijd'], end_time)
+    except Exception as e:
+        errors.append(f"Fout bij simuleren van batterij: {str(e)}")
+    
+    try:
+        charging(battery, actual_capacity, current_time_val, start_times, end_times)
+    except Exception as e:
+        errors.append(f"Fout bij batterij opladen: {str(e)}")
+    
+    try:
+        battery_consumption(distance, current_time_val, start_times, end_times)
+    except Exception as e:
+        errors.append(f"Fout bij berekening van batterijverbruik: {str(e)}")
+    
+    try:
+        check_route_continuity(bus_planning)
+    except Exception as e:
+        errors.append(f"Fout bij controle van routecontinuïteit: {str(e)}")
+    
+    try:
+        driven_rides(bus_planning)
+    except Exception as e:
+        errors.append(f"Fout bij controle van gereden ritten: {str(e)}")
+    
+    try:
+        normalize_time_format(df, time_column)
+    except Exception as e:
+        errors.append(f"Fout bij normalisatie van tijdformaat: {str(e)}")
+    
+    try:
+        every_ride_covered(bus_planning, time_table)
+    except Exception as e:
+        errors.append(f"Fout bij controle of elke rit gedekt is: {str(e)}")
+    
+    try:
+        plot_schedule(scheduled_orders)
+    except Exception as e:
+        errors.append(f"Fout bij plotten van het schema: {str(e)}")
+    
+    try:
+        check_travel_time(bus_planning, distance_matrix)
+    except Exception as e:
+        errors.append(f"Fout bij controle van reistijd: {str(e)}")
+    
+    try:
+        remove_startingtime_endtime_equal(bus_planning)
+    except Exception as e:
+        errors.append(f"Fout bij verwijderen van gelijke start- en eindtijden: {str(e)}")
+    
+    return errors
+
 
 # Bestand uploaden (CSV of Excel)
 uploaded_file = st.file_uploader("Upload je oploopschema (CSV of Excel)", type=["csv", "xlsx"])
@@ -555,14 +692,7 @@ if uploaded_file is not None:
         
         st.write("**Geüpload Oploopschema:**")
         st.dataframe(data)
-    
-        # Validatie functie (voorbeeld)
-        def validate_schema(df):
-            end_time = calculate_end_time(time_table['Row_Number']) # berekend end_time
-            battery = simulate_battery(uploaded_file, actual_capacity, time_table['vertrektijd'], end_time)
-            charging(battery, actual_capacity, current_time, start_time, end_time)
-
-            return errors
+        
         
         # Voer validatie uit
         validation_errors = validate_schema(data)
