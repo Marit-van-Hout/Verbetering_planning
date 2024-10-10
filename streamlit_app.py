@@ -11,7 +11,7 @@ def bus_checker_page():
 
     # Bestand uploaden
     uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"])
-
+    errors = []
     if uploaded_file is not None:
         try:
             # Probeer het Excel-bestand te lezen
@@ -19,7 +19,6 @@ def bus_checker_page():
             st.write("Geüpload bestand:")
             st.dataframe(data)
 
-<<<<<<< HEAD
             # Controleer teleportatie
             if data.iloc[-1]['eindlocatie'] != data.iloc[0]['startlocatie']:
                 errors.append("De eindlocatie van de laatste rit komt niet overeen met de beginlocatie van de eerste rit.")
@@ -62,7 +61,6 @@ def bus_checker_page():
             ax.set_ylabel('Energieverbruik (kWh)')
             ax.set_title('Snelheid vs Energieverbruik')
             st.pyplot(fig)
-=======
             # Valideer de data
             validation_errors = validate_bus_planning(data)
 
@@ -86,7 +84,6 @@ def help_page():
 # Functie om het busplanningsschema te valideren
 def validate_bus_planning(data):
     errors = []
->>>>>>> f290f8c0ad59305b1c1a4f0da55d939d5b8c0bd7
     
     # Voorbeeldcontroles
     # Controleer op ontbrekende waarden

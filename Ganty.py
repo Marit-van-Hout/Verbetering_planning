@@ -1,4 +1,4 @@
-
+import matplotlib.pyplot as plt
 
 def plot_schedule(scheduled_orders):
     """Plots a Gantt chart of the scheduled orders
