@@ -91,12 +91,17 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
     
     return battery
 
-# Probeer de conversie opnieuw
-time_table["vertrektijd"] = pd.to_datetime(time_table["vertrektijd"], format='%H:%M', errors='coerce')
-
 # fleurs probeersel van een starttijd van de dag
 start_tijden = []
 
+distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
+time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
+
+# Probeer de conversie opnieuw
+time_table["vertrektijd"] = pd.to_datetime(time_table["vertrektijd"], format='%H:%M', errors='coerce')
+
+# ik krijg hier errors dat er in distance_matrix geen rij gevonden kan worden bij de materiaal ritten (buslijn == NaN)
+# waar de startlocatie "ehvgar" is en de eindlocatie "ehvapt" of "ehvbst".
 def Start_day(line):
     """
     Deze functie kijkt naar de kolom 'startlocatie' in time_table. 
@@ -131,7 +136,7 @@ def Start_day(line):
                     # Voeg de starttijd toe aan de lijst
                     start_tijden.append((line, start_locatie, start_day))  # Voeg lijn en locatie toe
                 else:
-                    errors.append(f"Geen matchende rit gevonden van 'ehvgar' naar {start_locatie}")
+                    errors.append(f"Geen matchende rit gevonden van 'ehvgar' naar {start_locatie} functie Start_day")
 
             else:
                 errors.append("Startlocatie niet herkend:", start_locatie)
@@ -148,6 +153,8 @@ print("Starttijden van de dag:", start_tijden)
 # fleurs probeersel van een eindtijden van de dag
 import pandas as pd
 
+# ik krijg hier errors dat er in distance_matrix geen rij gevonden kan worden bij de materiaal ritten (buslijn == NaN)
+# waar de startlocatie "ehvgar" is en de eindlocatie "ehvapt" of "ehvbst".
 # Lijst om de eindtijden op te slaan
 eind_tijden = []
 
@@ -163,19 +170,19 @@ def eind_dag(line):
         # Controleer beide locaties: 'ehvapt' en 'ehvbst'
         for locatie in ["ehvapt", "ehvbst"]:
             # Filter de laatste rit vanuit de huidige locatie
-            mask = (time_table["buslijn"] == line) & (time_table["eindlocatie"] == locatie)
+            mask = (time_table["buslijn"] == line) & (time_table["eindlocatie"] == locatie) # dus "ehvapt" of "ehvbst"
             if not time_table[mask].empty:
-                laatste_rit = time_table[mask].iloc[-1]
-                eind_vertrektijd = laatste_rit["vertrektijd"]
+                laatste_rit = time_table[mask].iloc[-1] # kijk naar de laatste rij
+                eind_vertrektijd = laatste_rit["vertrektijd"] # Nu kijken we naar de allerlaaste dienstrit en daar de vertrektijd van 
 
                 # Zorg ervoor dat eind_vertrektijd een datetime object is
                 eind_vertrektijd = pd.to_datetime(eind_vertrektijd)
 
                 # Zoek de reistijd naar 'ehvgar' in de distance_matrix
                 reistijd_mask = (
-                    (distance_matrix["startlocatie"] == locatie) &
-                    (distance_matrix["eindlocatie"] == "ehvgar") &
-                    (distance_matrix["buslijn"].isna())
+                    (distance_matrix["startlocatie"] == locatie) & # zorg dat de startlocatie "ehvapt" of "ehvbst"is.
+                    (distance_matrix["eindlocatie"] == "ehvgar") & # zorg dat de eindlocatie "ehvgar" is
+                    (distance_matrix["buslijn"].isna()) # zorg dat je kijkt naar de materiaal ritten
                 )
                 
                 if not distance_matrix[reistijd_mask].empty:
@@ -187,11 +194,11 @@ def eind_dag(line):
                     # Voeg de eindtijd toe aan de lijst met de locatie vermeld
                     eind_tijden.append((line, locatie, eind_dag_tijd))
                 else:
-                    errors.append(f"Geen matchende rit gevonden van {locatie} naar 'ehvgar' voor lijn {line}")
+                    errors.append(f"Geen matchende rit gevonden van {locatie} naar 'ehvgar' voor lijn {line} functie eind_dag")
             else:
-                errors.append(f"Geen ritten gevonden voor buslijn {line} met eindlocatie {locatie}")
+                errors.append(f"Geen ritten gevonden voor buslijn {line} met eindlocatie {locatie} functie eind_dag")
     else:
-        errors.append(f"Geen ritten gevonden voor buslijn {line}")
+        errors.append(f"Geen ritten gevonden voor buslijn {line} functie eind_dag")
 
 # Roep de functie aan voor beide buslijnen
 eind_dag(400)
