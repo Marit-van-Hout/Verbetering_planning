@@ -11,7 +11,7 @@ def bus_checker_page():
 
     # Bestand uploaden
     uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"])
-    errors = []
+
     if uploaded_file is not None:
         try:
             # Probeer het Excel-bestand te lezen
@@ -19,48 +19,6 @@ def bus_checker_page():
             st.write("Geüpload bestand:")
             st.dataframe(data)
 
-            # Controleer teleportatie
-            if data.iloc[-1]['eindlocatie'] != data.iloc[0]['startlocatie']:
-                errors.append("De eindlocatie van de laatste rit komt niet overeen met de beginlocatie van de eerste rit.")
-            
-            # Controleer reistijden, coverage, en idle tijd
-            for i in range(len(data) - 1):
-                current_end_location = data.iloc[i]['eindlocatie']
-                next_start_location = data.iloc[i + 1]['startlocatie']
-                # Check of eindlocatie van de huidige rit overeenkomt met de startlocatie van de volgende rit
-                if current_end_location != next_start_location:
-                    errors.append(f"Route continuïteit probleem tussen rit {data.iloc[i]['buslijn']} en {data.iloc[i + 1]['buslijn']}.")
-            
-            return errors
-        
-        # Voer validatie uit
-        validation_errors = validate_schema(data)
-        
-        if validation_errors:
-            
-            st.error("Er zijn fouten gevonden in het oploopschema:")
-            for error in validation_errors:
-                st.error(error)
-        else:
-            st.success("Het oploopschema is geldig!")
-            
-            # Voeg een downloadknop toe voor het gevalideerde schema
-            csv = data.to_csv(index=False)
-            st.download_button(
-                label="Download gevalideerd schema als CSV",
-                data=csv,
-                file_name='gevalideerd_oploopschema.csv',
-                mime='text/csv'
-            )
-            
-            # Optionele visualisatie
-            st.write("**Visualisatie van het Oploopschema:**")
-            fig, ax = plt.subplots()
-            ax.scatter(data['speed'], data['energy'])
-            ax.set_xlabel('Snelheid (km/uur)')
-            ax.set_ylabel('Energieverbruik (kWh)')
-            ax.set_title('Snelheid vs Energieverbruik')
-            st.pyplot(fig)
             # Valideer de data
             validation_errors = validate_bus_planning(data)
 
