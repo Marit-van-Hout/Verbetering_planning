@@ -231,9 +231,6 @@ def current_time(time_table):
     # Als er geen vertrektijd meer is, geef dan de laatste vertrektijd terug
     return time_table['vertrektijd_dt'].iloc[-1].time()
 
-# Voorbeeld van het gebruik van de current_time functie
-huidige_tijd = current_time(time_table)
-print("Huidige tijd in het schema:", huidige_tijd)
 
 # Battery charging simulation
 def charging(battery, actual_capacity, current_time, start_time, end_time): # dit werkt niet als we niet de echte begintijd en eindtijd van de dag hebben.
