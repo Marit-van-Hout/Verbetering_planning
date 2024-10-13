@@ -60,18 +60,18 @@ def calculate_end_time(row):
         return None
     
 #def calculate_end_time_1(row):
-    #""" Adds the maximum travel time to the departure time to create a column with end time.
-    #Parameters: row
-    #Output: end time in HH:MM
-    #"""
-    #travel_time = distance_matrix[(distance_matrix['startlocatie'] == row['startlocatie']) & 
-    #                             (distance_matrix['eindlocatie'] == row['eindlocatie'])]['min reistijd in uur'].values
-    #if len(travel_time) > 0:  # Check if travel_time is not empty
-    #    travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
-    #    end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
-    #    return end_time
-    #else:
-    #    return None
+    """ Adds the maximum travel time to the departure time to create a column with end time.
+    Parameters: row
+    Output: end time in HH:MM
+    """
+    travel_time = distance_matrix[(distance_matrix['startlocatie'] == row['startlocatie']) & 
+                                 (distance_matrix['eindlocatie'] == row['eindlocatie'])]['min reistijd in uur'].values
+    if len(travel_time) > 0:  # Check if travel_time is not empty
+        travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
+        end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
+        return end_time
+    else:
+        return None
 
 time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
 
@@ -261,7 +261,7 @@ if errors:
     print("Fouten:", errors)
 
 
-# Fleurs creatie. Misshien was het niet gevraagd maar ja
+# Fleurs creatie. 
 def current_time(time_table):
     """
     Deze functie houdt bij waar we zijn in het schema en laat de tijd zien.
@@ -300,7 +300,7 @@ def current_time(time_table):
     #new_battery = battery + charged_energy if battery <= min_battery else battery
     #return min(new_battery, max_battery)
 
-# fleurs creatie: ik zou het niet vertrouwen 
+# fleurs creatie:
 def charging(battery, actual_capacity, current_time, start_times, end_times):
     """
     Simuleert het opladen van de batterij op basis van de huidige tijd en start- en eindtijden van de dienstregeling.
@@ -353,7 +353,7 @@ def charging(battery, actual_capacity, current_time, start_times, end_times):
     new_battery = battery + charged_energy if battery <= min_battery else battery
     return min(new_battery, max_battery)
 
-# fleurs creatie: ik zou deze ook niet vertrouwen
+# fleurs creatie
 def battery_consumption(distance, current_time, start_times, end_times):
     """
     Bereken het batterijverbruik op basis van de afstand en huidige tijd.
@@ -399,7 +399,7 @@ def battery_consumption(distance, current_time, start_times, end_times):
     # Roep de charging-functie aan om het resterende batterijpercentage bij te werken
     return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
 
-def battery_consumption(distance, current_time, start_time, end_time): # hier geld precies hetzelfde.
+#def battery_consumption(distance, current_time, start_time, end_time): # hier geld precies hetzelfde.
     """Calculate battery consumption based on distance and time."""
     battery_capacity = max_capacity * 0.9
     consumption = distance * np.mean(consumption_per_km)
@@ -415,7 +415,7 @@ def check_route_continuity(bus_planning): # de bus kan niet vliegen
         - bus_planning: DataFrame with route data.
     Output: Print messages if there are inconsistencies.
     """
-    for i in range(len(bus_planning) - 1):
+    for i in range(len(bus_planning) - 1): 
         current_end_location = bus_planning.iloc[i]['eindlocatie']
         next_start_location = bus_planning.iloc[i + 1]['startlocatie']
         if current_end_location != next_start_location:
@@ -439,7 +439,7 @@ def driven_rides(bus_planning):
     clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn'])
     return clean_bus_planning
 
-def normalize_time_format(df, time_column):
+#def normalize_time_format(df, time_column):
     """Convert time to a uniform format, ignoring seconds.
     Parameters: 
         - df : DataFrame
@@ -536,11 +536,11 @@ def plot_schedule(scheduled_orders):
     plt.show()
           
 uploaded_file = driven_rides(uploaded_file)
-uploaded_file = normalize_time_format(uploaded_file, "starttijd")
+#uploaded_file = normalize_time_format(uploaded_file, "starttijd")
 
-result = every_ride_covered(uploaded_file, time_table)
+#result = every_ride_covered(uploaded_file, time_table)
 
-print(result)
+#print(result)
 
 def check_travel_time(bus_planning, distance_matrix):
     """
@@ -594,6 +594,7 @@ def remove_startingtime_endtime_equal(bus_planning):
     clean_bus_planning = bus_planning[bus_planning['starttijd'] != bus_planning['eindtijd']]
     return clean_bus_planning
 
+#new_planning = remove_startingtime_endtime_equal(uploaded_file)
 
 #new_planning = remove_startingtime_endtime_equal(bus_planning)
 
@@ -780,7 +781,6 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Er is een fout opgetreden bij het verwerken van het bestand: {str(e)}")
 
-new_planning = remove_startingtime_endtime_equal(uploaded_file)
 
 
 
