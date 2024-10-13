@@ -32,6 +32,7 @@ errors = []
 distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
 distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60
 distance_matrix["max reistijd in uur"] = distance_matrix["max reistijd in min"] / 60
+distance_matrix["mean reistijd in uur"] = (distance_matrix["min reistijd in uur"] + distance_matrix["max reistijd in uur"]) / 2
 distance_matrix["buslijn"] = distance_matrix["buslijn"].fillna("deadhead trip")
 distance_matrix["max_energy"] = distance_matrix["afstand in km"] * 2.5
 distance_matrix["min_energy"] = distance_matrix["afstand in km"] * 0.7
@@ -42,22 +43,39 @@ time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetim
 
 # fleur: ik denk dat dit een fout is geweest maar moet dit niet gebaseerd zijn op de "max reistijd in min" en niet de "min reistijd in min"
 # fleur: is het niet handiger als we de mean ervan nemen en die opstellen als de normale "end_time"
+# fleurs aangepaste code:
+# aanpassen:
 def calculate_end_time(row):
     """ Adds the maximum travel time to the departure time to create a column with end time.
     Parameters: row
     Output: end time in HH:MM
     """
     travel_time = distance_matrix[(distance_matrix['startlocatie'] == row['startlocatie']) & 
-                                  (distance_matrix['eindlocatie'] == row['eindlocatie'])]['min reistijd in uur'].values
+                                  (distance_matrix['eindlocatie'] == row['eindlocatie'])]["mean reistijd in uur"].values
     if len(travel_time) > 0:  # Check if travel_time is not empty
         travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
         end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
         return end_time
     else:
         return None
+    
+#def calculate_end_time_1(row):
+    #""" Adds the maximum travel time to the departure time to create a column with end time.
+    #Parameters: row
+    #Output: end time in HH:MM
+    #"""
+    #travel_time = distance_matrix[(distance_matrix['startlocatie'] == row['startlocatie']) & 
+    #                             (distance_matrix['eindlocatie'] == row['eindlocatie'])]['min reistijd in uur'].values
+    #if len(travel_time) > 0:  # Check if travel_time is not empty
+    #    travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
+    #    end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
+    #    return end_time
+    #else:
+    #    return None
 
 time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
 
+# fleur versie 
 def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
     """Simulate battery usage throughout the day based on the bus planning."""
     battery = actual_capacity * 0.9
@@ -69,14 +87,14 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
         end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
         
         # Check if the trip is a regular or deadhead trip
-        if row['activiteit'] in ['regular trip', 'deadhead trip']:
-            consumption = row['energieverbruik']
-            battery -= consumption
-            if battery < min_battery:
+        if row['activiteit'] in ['dienst rit', 'materiaal rit']: # als activiteit dienst rit of materiaal rit is:
+            consumption = row['energieverbruik'] # dan kijken we naar de consuption rij van deze rit
+            battery -= consumption # dit gaat min de batterij die we al hebben
+            if battery < min_battery: # als de batterij minder dan 10 is 
                 errors.append(f"Warning: Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
         
-        # Check if the bus has enough time to charge
-        elif row['activiteit'] == 'opladen':
+        # Check if the bus has enough time to charge # dit klopt hememaal: Fleur
+        elif row['activiteit'] == 'opladen': # als de activiteit opladen is
             idle_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
             idle_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
             idle_time = (idle_end_time - idle_start_time).total_seconds() / 60
@@ -90,6 +108,39 @@ def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
             errors.append(f"Warning: Battery too low after {row['starttijd']}.")
     
     return battery
+
+#def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
+    #"""Simulate battery usage throughout the day based on the bus planning."""
+    #battery = actual_capacity * 0.9
+    #min_battery = actual_capacity * 0.1
+
+    # Convert start and end times to datetime
+    #for i, row in uploaded_file.iterrows():
+        #start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+        #end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+        
+        # Check if the trip is a regular or deadhead trip
+        #if row['activiteit'] in ['regular trip', 'deadhead trip']:
+            #consumption = row['energieverbruik']
+            #battery -= consumption
+            #if battery < min_battery:
+                #errors.append(f"Warning: Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
+        
+        # Check if the bus has enough time to charge
+        #elif row['activiteit'] == 'opladen':
+            #idle_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+            #idle_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            #idle_time = (idle_end_time - idle_start_time).total_seconds() / 60
+            #if idle_time >= min_idle_time:
+                #battery = charging(battery, actual_capacity, idle_start_time, start_time, end_time)
+            #else:
+                #errors.append(f"Warning: Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
+
+        # Ensure battery remains above 10%
+        #if battery < min_battery:
+            #errors.append(f"Warning: Battery too low after {row['starttijd']}.")
+    
+    #return battery
 
 # fleurs probeersel van een starttijd van de dag
 start_tijden = []
@@ -233,21 +284,21 @@ def current_time(time_table):
 
 
 # Battery charging simulation
-def charging(battery, actual_capacity, current_time, start_time, end_time): # dit werkt niet als we niet de echte begintijd en eindtijd van de dag hebben.
-    """Charge the battery based on the current time and time table.""" # ook hebben we geen funtie die de current_time bijhoud.
-    min_battery = 0.10 * actual_capacity
-    max_battery_day = 0.90 * actual_capacity
-    max_battery_night = actual_capacity
-    charging_per_min = charging_speed_90
+#def charging(battery, actual_capacity, current_time, start_time, end_time): # dit werkt niet als we niet de echte begintijd en eindtijd van de dag hebben.
+    #"""Charge the battery based on the current time and time table.""" # ook hebben we geen funtie die de current_time bijhoud.
+    #min_battery = 0.10 * actual_capacity
+    #max_battery_day = 0.90 * actual_capacity
+    #max_battery_night = actual_capacity
+    #charging_per_min = charging_speed_90
 
-    if current_time < start_time or current_time > end_time:
-        max_battery = max_battery_night
-    else:
-        max_battery = max_battery_day
+    #if current_time < start_time or current_time > end_time:
+        #max_battery = max_battery_night
+    #else:
+        #max_battery = max_battery_day
 
-    charged_energy = min_idle_time * charging_per_min
-    new_battery = battery + charged_energy if battery <= min_battery else battery
-    return min(new_battery, max_battery)
+    #charged_energy = min_idle_time * charging_per_min
+    #new_battery = battery + charged_energy if battery <= min_battery else battery
+    #return min(new_battery, max_battery)
 
 # fleurs creatie: ik zou het niet vertrouwen 
 def charging(battery, actual_capacity, current_time, start_times, end_times):
