@@ -436,10 +436,10 @@ def driven_rides(bus_planning):
         and rows where a bus line is present.
     """
     clean_bus_planning = bus_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
-    clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn'])
+    clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn']) # dropt alle rijen die geen buslijn hebben
     return clean_bus_planning
 
-#def normalize_time_format(df, time_column):
+#def normalize_time_format(df, time_column): # dit heb ik gedaan omdat het anders niet werkte
     """Convert time to a uniform format, ignoring seconds.
     Parameters: 
         - df : DataFrame
@@ -536,7 +536,7 @@ def plot_schedule(scheduled_orders):
     plt.show()
           
 uploaded_file = driven_rides(uploaded_file)
-#uploaded_file = normalize_time_format(uploaded_file, "starttijd")
+uploaded_file = normalize_time_format(uploaded_file, "starttijd")
 
 #result = every_ride_covered(uploaded_file, time_table)
 
@@ -594,9 +594,7 @@ def remove_startingtime_endtime_equal(bus_planning):
     clean_bus_planning = bus_planning[bus_planning['starttijd'] != bus_planning['eindtijd']]
     return clean_bus_planning
 
-#new_planning = remove_startingtime_endtime_equal(uploaded_file)
-
-#new_planning = remove_startingtime_endtime_equal(bus_planning)
+new_planning = remove_startingtime_endtime_equal(uploaded_file)
 
 st.title("🎈 Oploopschema Validatie App")
 st.write(

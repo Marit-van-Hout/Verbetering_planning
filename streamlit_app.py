@@ -37,9 +37,10 @@ distance_matrix["min_energy"] = distance_matrix["afstand in km"] * 0.7
 
 #new_planning = remove_startingtime_endtime_equal(uploaded_file)
 #new_planning = remove_startingtime_endtime_equal(bus_planning)
+# wat is het verschil tussen de uploaded_file en de bus_planning?
 
 def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, start_times, end_times, 
-                   distance, bus_planning, df, time_column, scheduled_orders, distance_matrix) -> list[str]:
+                   distance, bus_planning, scheduled_orders, distance_matrix) -> list[str]:
     """
     Valideert het schema van een busplanning.
 
@@ -49,7 +50,6 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     - uploaded_file, actual_capacity, start_times, end_times: Vereiste parameters voor de simulatie en batterijfuncties.
     - distance: Afstand voor batterijverbruik.
     - bus_planning: De planning van de bus.
-    - df, time_column: DataFrame en tijdkolom voor normalisatie.
     - scheduled_orders: Geplande orders voor plotting.
     - distance_matrix: Matrix voor reistijdcontrole.
 
@@ -354,6 +354,8 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         clean_bus_planning = bus_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
         clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn']) # dropt alle rijen die geen buslijn hebben
         return clean_bus_planning
+    
+    uploaded_file = driven_rides(uploaded_file)
 
     def every_ride_covered(bus_planning, time_table):
         """Checks if every ride in the timetable is covered in bus planning.
@@ -577,6 +579,9 @@ def bus_checker_page():
             data = pd.read_excel(uploaded_file)
             st.write("Geüpload bestand:")
             st.dataframe(data)
+
+            #distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
+            #time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
             # Valideer de data
             validation_errors = validate_schema(data)
