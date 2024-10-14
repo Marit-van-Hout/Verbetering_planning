@@ -536,7 +536,6 @@ def plot_schedule(scheduled_orders):
     plt.show()
           
 uploaded_file = driven_rides(uploaded_file)
-uploaded_file = normalize_time_format(uploaded_file, "starttijd")
 
 #result = every_ride_covered(uploaded_file, time_table)
 

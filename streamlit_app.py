@@ -10,36 +10,15 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
 # Load data
-uploaded_file = pd.read_excel('omloopplanning.xlsx')
-distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
-time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
+#uploaded_file = pd.read_excel('omloopplanning.xlsx')
 #bus_planning_2 = pd.read_excel('omloopplanning.xlsx')  
 
-# Parameters
-max_capacity = 300 # maximum capacity in kWh
-SOH = [85, 95] # State of Health
-charging_speed_90 = 450 / 60 # kWh per minute when charging to 90%
-charging_time_10 = 60 / 60 # kWh per minute when charging from 90% to 100%
-actual_capacity_90 = max_capacity * 0.9
-actual_capacity = actual_capacity_90 
-daytime_limit = actual_capacity_90 * 0.9
-consumption_per_km = (0.7 + 2.5) / 2 # kWh per km
-min_idle_time = 15
-
-# Data Preparation
-distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
-distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60
-distance_matrix["max reistijd in uur"] = distance_matrix["max reistijd in min"] / 60
-distance_matrix["mean reistijd in uur"] = (distance_matrix["min reistijd in uur"] + distance_matrix["max reistijd in uur"]) / 2
-distance_matrix["buslijn"] = distance_matrix["buslijn"].fillna("deadhead trip")
-distance_matrix["max_energy"] = distance_matrix["afstand in km"] * 2.5
-distance_matrix["min_energy"] = distance_matrix["afstand in km"] * 0.7
 
 #new_planning = remove_startingtime_endtime_equal(uploaded_file)
 #new_planning = remove_startingtime_endtime_equal(bus_planning)
 # wat is het verschil tussen de uploaded_file en de bus_planning?
 
-def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, start_times, end_times, 
+def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, 
                    distance, bus_planning, scheduled_orders, distance_matrix) -> list[str]:
     """
     Valideert het schema van een busplanning.
@@ -56,7 +35,20 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     Returns:
     - Een lijst van foutmeldingen die zijn opgetreden tijdens de validatie.
     """
+    distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
+    time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
+    # Parameters
+    max_capacity = 300 # maximum capacity in kWh
+    SOH = [85, 95] # State of Health
+    charging_speed_90 = 450 / 60 # kWh per minute when charging to 90%
+    charging_time_10 = 60 / 60 # kWh per minute when charging from 90% to 100%
+    actual_capacity_90 = max_capacity * 0.9
+    actual_capacity = actual_capacity_90 
+    daytime_limit = actual_capacity_90 * 0.9
+    consumption_per_km = (0.7 + 2.5) / 2 # kWh per km
+    min_idle_time = 15
+    
     # Data Preparation
     distance_matrix["afstand in km"] = distance_matrix["afstand in meters"] / 1000
     distance_matrix["min reistijd in uur"] = distance_matrix["min reistijd in min"] / 60
@@ -70,13 +62,14 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     start_tijden = []
     eind_tijden = []
 
+    start_times = time_table["vertrektijd"]
     time_table['Row_Number'] = time_table.index + 1
     time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetime.strptime(x, '%H:%M'))
     time_table["vertrektijd"] = pd.to_datetime(time_table["vertrektijd"], format='%H:%M', errors='coerce')
 
 
     def calculate_end_time(row):
-        """ Adds the maximum travel time to the departure time to create a column with end time.
+        """ Adds the mean travel time to the departure time to create a column with end time in dataframe time_table.
         Parameters: row
         Output: end time in HH:MM
         """
@@ -89,6 +82,8 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         else:
             return None
 
+    end_times = calculate_end_time(time_table['Row_Number'])
+    
     time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
 
     def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
@@ -571,7 +566,7 @@ def bus_checker_page():
     st.write("Deze pagina stelt je in staat om het busplanningsschema te controleren.")
 
     # Bestand uploaden
-    uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"])
+    uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"]) # dit is de data die erin komt
 
     if uploaded_file is not None:
         try:
@@ -579,9 +574,6 @@ def bus_checker_page():
             data = pd.read_excel(uploaded_file)
             st.write("Geüpload bestand:")
             st.dataframe(data)
-
-            #distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
-            #time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
             # Valideer de data
             validation_errors = validate_schema(data)
