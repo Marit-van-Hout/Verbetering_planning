@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import streamlit as st
 from io import StringIO
 from datetime import datetime, timedelta
 from wiskundig_model import charging
@@ -119,7 +118,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
         return battery
 
-    def Start_day(line):
+    def start_day(line):
         """
         Deze functie kijkt naar de kolom 'startlocatie' in time_table. 
         Voor elke lijn wordt de tijd van een rit met materiaal (buslijn = NaN) vanuit 'ehvgar' 
@@ -160,7 +159,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         else:
             errors.append("Geen ritten gevonden voor buslijn", line)
 
-    def eind_dag(line):
+    def end_day(line):
         """
         Deze functie berekent de eindtijden van de dag voor een bepaalde buslijn, vanuit zowel 'ehvapt' als 'ehvbst'.
         Voor beide locaties wordt de laatste vertrektijd genomen en gecombineerd met de reistijd naar 'ehvgar' uit de distance_matrix.
@@ -488,15 +487,15 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
     try: 
         # Roep de functie aan voor beide buslijnen
-        Start_day(400)
-        Start_day(401)
+        start_day(400)
+        start_day(401)
     except Exception as e:
         errors.append(f"Fout bij berekenen van de start van de dag: {str(e)}")
 
     try: 
         # Roep de functie aan voor beide buslijnen
-        eind_dag(400)
-        eind_dag(401)
+        end_day(400)
+        end_day(401)
     except Exception as e:
         errors.append(f"Fout bij berekenen van de eind van de dag: {str(e)}")
     
