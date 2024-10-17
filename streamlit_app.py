@@ -550,9 +550,9 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
     return errors,start_tijden,eind_tijden
 
-st.title("🎈 Oploopschema Validatie App")
+st.title("🎈 Bus planning checker app")
 st.write(
-    "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema."
+    "Upload your bus planning (CSV or Excel) and download the validated schedule."
 ) 
 
 # Display the logo
@@ -561,7 +561,7 @@ st.image("logo_transdev_klein.png", width=200)
 # Define pages
 def bus_checker_page():
     st.title("🚌 Bus Planning Checker")
-    st.write("Deze pagina stelt je in staat om het busplanningsschema te controleren.")
+    st.write("This page ensures that you can check your planning.")
 
     # Bestand uploaden
     uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"]) # dit is de data die erin komt
@@ -588,11 +588,11 @@ def bus_checker_page():
 
 def how_it_works_page():
     st.title("📖 How It Works")
-    st.write("Deze sectie legt uit hoe de applicatie werkt.")
+    st.write("This section explains how it works.")
 
 def help_page():
     st.title("❓ Help")
-    st.write("Deze pagina biedt hulp en ondersteuning.")
+    st.write("This page gives help to the people who need it.")
 
 # Functie om het busplanningsschema te valideren
 #def validate_bus_planning(data):
