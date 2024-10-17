@@ -2,9 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from io import StringIO
 from datetime import datetime, timedelta
-from wiskundig_model import charging
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
@@ -569,7 +567,7 @@ def validate_schema(bus_planning, time_table, distance_matrix):
     return errors,start_tijden,eind_tijden
 
 # Display the logo
-st.image("logo_transdev_klein.png", width=200)
+st.image("tra_logo_rgb_HR.png", width=200)
 
 # Define pages
 def bus_checker_page():
