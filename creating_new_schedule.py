@@ -61,3 +61,21 @@ df = pd.merge(df_filtered, distance_matrix , on=['startlocatie', 'eindlocatie', 
 consumption_per_km = (0.7 + 2.5) / 2  
 df['consumptie_kWh'] = (df['afstand in meters']/1000) * consumption_per_km
 
+
+start_batterij = 270
+def bereken_batterij(row, vorige_batterij, vorige_omloopnummer): 
+    if row['omloop nummer'] != vorig_omloopnummer: 
+        vorig_batterij = start_batterij
+    nieuwe_batterij = vorige_batterij - row['consumptie_kWh']
+    return nieuwe_batterij
+
+batterij = start_batterij
+vorig_omloopnummer = df['omloop nummer'][0]
+batterij_status = []
+
+for i, row in df.iterrows(): 
+    batterij = bereken_batterij(row, batterij, vorig_omloopnummer)
+    batterij_status.append(batterij)
+    vorig_omloopnummer = row['omloop nummer']
+
+df['batterij_status'] = batterij_status
