@@ -79,3 +79,5 @@ for i, row in df.iterrows():
     vorig_omloopnummer = row['omloop nummer']
 
 df['batterij_status'] = batterij_status
+
+#df.to_excel('perfectie.xlsx', index=False)
