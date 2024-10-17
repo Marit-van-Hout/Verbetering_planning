@@ -572,8 +572,7 @@ st.image("tra_logo_rgb_HR.png", width=200)
 # Define pages
 def bus_checker_page():
     st.title("Bus Planning Checker")
-    st.write("This page ensures that you can check your planning.")
-
+    
     # Bestand uploaden
     uploaded_file = st.file_uploader("Upload Your Bus Planning Here (xlsx)", type=["xlsx"], key="file1") # dit is de data die erin komt
     given_data = st.file_uploader("Upload Your Time Table Here (xlsx)", type=["xlsx"], key="file2") # dit is de data die erin komt
@@ -601,11 +600,11 @@ def bus_checker_page():
             st.error(f"Fout bij het uploaden of lezen van het bestand: {str(e)}")
 
 def how_it_works_page():
-    st.title("📖 How It Works")
+    st.title("How It Works")
     st.write("This section explains how it works.")
 
 def help_page():
-    st.title("❓ Help")
+    st.title("Help")
     st.write("This page gives help to the people who need it.")
 
 # Functie om het busplanningsschema te valideren
@@ -628,7 +627,7 @@ def help_page():
     #return errors
 
 # Hoofd pagina selector
-page = st.sidebar.selectbox("Selecteer een pagina", ["Bus Planning Checker", "How It Works", "Help"])
+page = st.sidebar.selectbox("Select a Page", ["Bus Planning Checker", "How It Works", "Help"])
 
 if page == "Bus Planning Checker":
     bus_checker_page()
