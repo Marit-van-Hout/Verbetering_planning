@@ -2,9 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from io import StringIO
 from datetime import datetime, timedelta
-from wiskundig_model import charging
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
@@ -385,52 +383,74 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
             return "Bus planning is equal to time table"
 
-    def plot_schedule(scheduled_orders):
-        """Plots a Gantt chart of the scheduled orders
+    def plot_schedule_from_excel(uploaded_file):
+     """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
+    
+      # Zorg ervoor dat de juiste datatypes zijn ingesteld
+        uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'])
+        uploaded_file['eindtijd'] = pd.to_datetime(uploaded_file['eindtijd'])
+    
+        # Bereken de duur in uren
+        uploaded_file['duration'] = (uploaded_file['eindtijd'] - uploaded_file['starttijd']).dt.total_seconds() / 3600
 
-        Args:
-            scheduled_orders (dict): every order, their starting time, end time, on which machine and set-up time
-        """    
-        fig, ax = plt.subplots(figsize=(10, 6))
-    
-        y_pos = 0
-    
-        # Colors for visualization
-        color_map = {
-            '400': 'blue',
-            '401': 'yellow',
-        }
-    
-        for machine, orders in scheduled_orders.items():
-            y_pos += 1  # Voor elke machine
-            for order in orders:
-                order_color = order['colour']
-                processing_time = order['end_time'] - order['start_time'] - order['setup_time']
-                setup_time = order['setup_time']
-                start_time = order['start_time']
-            
-                # Controleer of de kleur aanwezig is in de color_map
-                if order_color in color_map:
-                    color = color_map[order_color]
-                else:
-                    color = 'black'  # Default color als de kleur niet bestaat in color_map
-            
-                # Teken verwerkingstijd
-                ax.barh(y_pos, processing_time, left=start_time + setup_time, color=color, edgecolor='black')
-                ax.text(start_time + setup_time + processing_time / 2, y_pos, f"Order {order['order']}", 
-                        ha='center', va='center', color='black', rotation=90)
+    # Kleurmap voor verschillende buslijnen
+    color_map = {
+        '400.0': 'blue',
+        '401.0': 'yellow'
+    }
 
-                # Teken setup tijd
-                if setup_time > 0:
-                    ax.barh(y_pos, setup_time, left=start_time, color='gray', edgecolor='black', hatch='//')
+    # Zet de buslijnwaarden om naar strings
+    uploaded_file['buslijn'] = uploaded_file['buslijn'].astype(str)
+
+    # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
+    uploaded_file['color'] = uploaded_file['buslijn'].map(color_map).fillna('gray')
+
+    # Maak een figuur voor het plotten
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Omloopnummers op de Y-as
+    omloopnummers = uploaded_file['omloop nummer'].unique()
+    omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
+
+    # Loop door de unieke omloopnummers
+    for omloop in omloopnummers:
+        trips = uploaded_file[uploaded_file['omloop nummer'] == omloop]
+        
+        # Controleer of er ritten zijn
+        if trips.empty:
+            # Voeg een zwart blok toe als er geen ritten zijn
+            ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
+            continue
+        
+        # Plot elke trip voor de huidige omloop
+        for _, trip in trips.iterrows():
+            starttime = trip['starttijd']
+            duration = trip['duration']
+            color = trip['color']  # Haal de kleur direct uit de DataFrame
+
+            # Plot de busrit als een horizontale balk
+            ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
+                    color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else "")
     
-        ax.set_yticks(range(1, len(scheduled_orders) + 1))
-        ax.set_yticklabels([f"Machine {m}" for m in scheduled_orders.keys()])
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Machines')
-        ax.set_title('Gantt Chart for Paint Shop Scheduling')
+    # Zet de Y-ticks en labels voor de omloopnummers
+    ax.set_yticks(list(omloop_indices.values()))
+    ax.set_yticklabels(list(omloop_indices.keys()))
+
+        # Set axis labels and title
+        ax.set_xlabel('Time (hours)')
+        ax.set_ylabel('Omloopnummer')
+        ax.set_title('Gantt Chart for Bus Scheduling')
+
+    # Voeg een legenda toe (voorkom dubbele labels)
+       handles, labels = ax.get_legend_handles_labels()
+        unique_labels = dict(zip(labels, handles))
+       ax.legend(unique_labels.values(), unique_labels.keys(), title='Buslijnen')
+
         plt.show()
 
+    # Voorbeeld van aanroepen van de functie (upload je DataFrame)
+    plot_schedule_from_excel(uploaded_file)
+        
     def check_travel_time(bus_planning, distance_matrix):
         """
         Check if the time difference between the start time and end time in bus planning

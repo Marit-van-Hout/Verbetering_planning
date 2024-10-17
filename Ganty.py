@@ -2,12 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+
 uploaded_file = pd.read_excel('omloopplanning.xlsx')
 distance_matrix = pd.read_excel('Connexxion data - 2024-2025.xlsx ',sheet_name = "Afstandsmatrix")
 time_table = pd.read_excel('Connexxion data - 2024-2025.xlsx ',sheet_name = "Dienstregeling")
 uploaded_file.head()
+
 def plot_schedule_from_excel(uploaded_file):
     """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
     
