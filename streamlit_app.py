@@ -568,22 +568,17 @@ def validate_schema(bus_planning, time_table, distance_matrix):
     
     return errors,start_tijden,eind_tijden
 
-st.title("🎈 Bus planning checker app")
-st.write(
-    "Upload your bus planning (CSV or Excel) and download the validated schedule."
-) 
-
 # Display the logo
 st.image("logo_transdev_klein.png", width=200)
 
 # Define pages
 def bus_checker_page():
-    st.title("🚌 Bus Planning Checker")
+    st.title("Bus Planning Checker")
     st.write("This page ensures that you can check your planning.")
 
     # Bestand uploaden
-    uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"], key="file1") # dit is de data die erin komt
-    given_data = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"], key="file2") # dit is de data die erin komt
+    uploaded_file = st.file_uploader("Upload Your Bus Planning Here (xlsx)", type=["xlsx"], key="file1") # dit is de data die erin komt
+    given_data = st.file_uploader("Upload Your Time Table Here (xlsx)", type=["xlsx"], key="file2") # dit is de data die erin komt
     
     if uploaded_file is not None:
         try:
@@ -591,7 +586,7 @@ def bus_checker_page():
             bus_planning = pd.read_excel(uploaded_file)
             time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
             distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
-            st.write("Geüpload bestand:")
+            st.write("Your Bus Planning:")
             st.dataframe(bus_planning)
 
             # Valideer de data
