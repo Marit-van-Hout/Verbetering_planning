@@ -17,15 +17,15 @@ import statsmodels.api as sm
 #new_planning = remove_startingtime_endtime_equal(bus_planning)
 # wat is het verschil tussen de uploaded_file en de bus_planning?
 
-def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, 
-                   distance, bus_planning, scheduled_orders, distance_matrix) -> list[str]:
+# validate_schema(bus_planning,time_table,distance_matrix)
+def validate_schema(bus_planning, time_table, distance_matrix):
     """
     Valideert het schema van een busplanning.
 
     Parameters:
     - row: Een dictionary met de gegevens van de rit.
     - time_table: Een DataFrame met vertrektijden en andere relevante informatie.
-    - uploaded_file, actual_capacity, start_times, end_times: Vereiste parameters voor de simulatie en batterijfuncties.
+    - uploaded_file, actual_capacity, start_times, end_time: Vereiste parameters voor de simulatie en batterijfuncties.
     - distance: Afstand voor batterijverbruik.
     - bus_planning: De planning van de bus.
     - scheduled_orders: Geplande orders voor plotting.
@@ -34,8 +34,6 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     Returns:
     - Een lijst van foutmeldingen die zijn opgetreden tijdens de validatie.
     """
-    distance_matrix = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Afstandsmatrix")
-    time_table = pd.read_excel("Connexxion data - 2024-2025.xlsx", sheet_name="Dienstregeling")
 
     # Parameters
     max_capacity = 300 # maximum capacity in kWh
@@ -55,6 +53,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     distance_matrix["buslijn"] = distance_matrix["buslijn"].fillna("deadhead trip")
     distance_matrix["max_energy"] = distance_matrix["afstand in km"] * 2.5
     distance_matrix["min_energy"] = distance_matrix["afstand in km"] * 0.7
+    distance = distance_matrix["afstand in km"]
 
     errors = []
     start_tijden = []
@@ -80,17 +79,15 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         else:
             return None
 
-    end_times = calculate_end_time(time_table['Row_Number'])
-    
     time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
 
-    def simulate_battery(uploaded_file, actual_capacity, start_time, end_time):
+    def simulate_battery(bus_planning, actual_capacity, start_time, end_time):
         """Simulate battery usage throughout the day based on the bus planning."""
         battery = actual_capacity * 0.9
         min_battery = actual_capacity * 0.1
 
         # Convert start and end times to datetime
-        for i, row in uploaded_file.iterrows():
+        for i, row in bus_planning.iterrows():
             start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
             end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
         
@@ -117,6 +114,8 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
         return battery
 
+    
+    
     def start_day(line):
         """
         Deze functie kijkt naar de kolom 'startlocatie' in time_table. 
@@ -221,7 +220,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         # Als er geen vertrektijd meer is, geef dan de laatste vertrektijd terug
         return time_table['vertrektijd_dt'].iloc[-1].time()
 
-    def charging(battery, actual_capacity, current_time, start_times, end_times):
+    def charging(battery, actual_capacity, current_time, start_times, end_time):
         """
         Simuleert het opladen van de batterij op basis van de huidige tijd en start- en eindtijden van de dienstregeling.
     
@@ -230,7 +229,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
             actual_capacity (float): Totale capaciteit van de batterij.
             current_time (datetime.time): Huidige tijd in het schema.
             start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
-            end_times (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
+            end_time (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
     
         Returns:
             float: Nieuwe batterijcapaciteit na opladen.
@@ -252,7 +251,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
         # Zoek de juiste eindtijd
         end_time = None
-        for line, locatie, tijd in end_times:
+        for line, locatie, tijd in end_time:
             if current_time >= tijd.time():
                 end_time = tijd
     
@@ -273,7 +272,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         new_battery = battery + charged_energy if battery <= min_battery else battery
         return min(new_battery, max_battery)
 
-    def battery_consumption(distance, current_time, start_times, end_times):
+    def battery_consumption(distance, current_time, start_times, end_time):
         """
         Bereken het batterijverbruik op basis van de afstand en huidige tijd.
     
@@ -281,7 +280,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
             distance (float): Afstand in kilometers.
             current_time (datetime.time): Huidige tijd in het schema.
             start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
-            end_times (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
+            end_time (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
     
         Returns:
             float: Resterende batterijcapaciteit na verbruik en opladen.
@@ -305,7 +304,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
         # Zoek de juiste eindtijd
         end_time = None
-        for line, locatie, tijd in end_times:
+        for line, locatie, tijd in end_time:
             if current_time >= tijd.time():
                 end_time = tijd
     
@@ -348,7 +347,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn']) # dropt alle rijen die geen buslijn hebben
         return clean_bus_planning
     
-    uploaded_file = driven_rides(uploaded_file)
+    bus_planning = driven_rides(bus_planning)
 
     def every_ride_covered(bus_planning, time_table):
         """Checks if every ride in the timetable is covered in bus planning.
@@ -385,50 +384,69 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
             return "Bus planning is equal to time table"
 
-    def plot_schedule(scheduled_orders):
-        """Plots a Gantt chart of the scheduled orders
+    def plot_schedule_from_excel(bus_planning):
+        """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
+    
+        # Zorg ervoor dat de juiste datatypes zijn ingesteld
+        bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'])
+        bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'])
+    
+        # Bereken de duur in uren
+        bus_planning['duration'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 3600
 
-        Args:
-            scheduled_orders (dict): every order, their starting time, end time, on which machine and set-up time
-        """    
-        fig, ax = plt.subplots(figsize=(10, 6))
-    
-        y_pos = 0
-    
-        # Colors for visualization
+        # Kleurmap voor verschillende buslijnen
         color_map = {
-            '400': 'blue',
-            '401': 'yellow',
+            '400.0': 'blue',
+            '401.0': 'yellow'
         }
-    
-        for machine, orders in scheduled_orders.items():
-            y_pos += 1  # Voor elke machine
-            for order in orders:
-                order_color = order['colour']
-                processing_time = order['end_time'] - order['start_time'] - order['setup_time']
-                setup_time = order['setup_time']
-                start_time = order['start_time']
-            
-                # Controleer of de kleur aanwezig is in de color_map
-                if order_color in color_map:
-                    color = color_map[order_color]
-                else:
-                    color = 'black'  # Default color als de kleur niet bestaat in color_map
-            
-                # Teken verwerkingstijd
-                ax.barh(y_pos, processing_time, left=start_time + setup_time, color=color, edgecolor='black')
-                ax.text(start_time + setup_time + processing_time / 2, y_pos, f"Order {order['order']}", 
-                        ha='center', va='center', color='black', rotation=90)
 
-                # Teken setup tijd
-                if setup_time > 0:
-                    ax.barh(y_pos, setup_time, left=start_time, color='gray', edgecolor='black', hatch='//')
+        # Zet de buslijnwaarden om naar strings
+        bus_planning['buslijn'] = bus_planning['buslijn'].astype(str)
+
+        # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
+        bus_planning['color'] = bus_planning['buslijn'].map(color_map).fillna('gray')
+
+        # Maak een figuur voor het plotten
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # Omloopnummers op de Y-as
+        omloopnummers = bus_planning['omloop nummer'].unique()
+        omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
+
+        # Loop door de unieke omloopnummers
+        for omloop in omloopnummers:
+            trips = bus_planning[bus_planning['omloop nummer'] == omloop]
+        
+            # Controleer of er ritten zijn
+            if trips.empty:
+                # Voeg een zwart blok toe als er geen ritten zijn
+                ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
+                continue
+        
+            # Plot elke trip voor de huidige omloop
+            for _, trip in trips.iterrows():
+                starttime = trip['starttijd']
+                duration = trip['duration']
+                color = trip['color']  # Haal de kleur direct uit de DataFrame
+
+                # Plot de busrit als een horizontale balk
+                ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
+                        color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else "")
     
-        ax.set_yticks(range(1, len(scheduled_orders) + 1))
-        ax.set_yticklabels([f"Machine {m}" for m in scheduled_orders.keys()])
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Machines')
-        ax.set_title('Gantt Chart for Paint Shop Scheduling')
+        # Zet de Y-ticks en labels voor de omloopnummers
+        ax.set_yticks(list(omloop_indices.values()))
+        ax.set_yticklabels(list(omloop_indices.keys()))
+
+        # Set axis labels and title
+        ax.set_xlabel('Time (hours)')
+        ax.set_ylabel('Omloopnummer')
+        ax.set_title('Gantt Chart for Bus Scheduling')
+
+        # Voeg een legenda toe (voorkom dubbele labels)
+        handles, labels = ax.get_legend_handles_labels()
+        unique_labels = dict(zip(labels, handles))
+        ax.legend(unique_labels.values(), unique_labels.keys(), title='Buslijnen')
+
         plt.show()
 
     def check_travel_time(bus_planning, distance_matrix):
@@ -480,7 +498,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
 
     # De validatiefuncties aanroepen
     try:
-        end_time = calculate_end_time(row)
+        end_time = calculate_end_time(time_table['Row_Number'])
     except Exception as e:
         errors.append(f"Fout bij berekenen van eindtijd: {str(e)}")
     
@@ -504,17 +522,17 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         errors.append(f"Fout bij ophalen van huidige tijd: {str(e)}")
     
     try:
-        battery = simulate_battery(uploaded_file, actual_capacity, time_table['vertrektijd'], end_time)
+        battery = simulate_battery(bus_planning, actual_capacity, time_table['vertrektijd'], end_time)
     except Exception as e:
         errors.append(f"Fout bij simuleren van batterij: {str(e)}")
     
     try:
-        charging(battery, actual_capacity, current_time_val, start_times, end_times)
+        charging(battery, actual_capacity, current_time_val, start_times, end_time)
     except Exception as e:
         errors.append(f"Fout bij batterij opladen: {str(e)}")
     
     try:
-        battery_consumption(distance, current_time_val, start_times, end_times)
+        battery_consumption(distance, current_time_val, start_times, end_time)
     except Exception as e:
         errors.append(f"Fout bij berekening van batterijverbruik: {str(e)}")
     
@@ -534,7 +552,7 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         errors.append(f"Fout bij controle of elke rit gedekt is: {str(e)}")
     
     try:
-        plot_schedule(scheduled_orders)
+        plot_schedule_from_excel(bus_planning)
     except Exception as e:
         errors.append(f"Fout bij plotten van het schema: {str(e)}")
     
@@ -564,17 +582,20 @@ def bus_checker_page():
     st.write("This page ensures that you can check your planning.")
 
     # Bestand uploaden
-    uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"]) # dit is de data die erin komt
-
+    uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"], key="file1") # dit is de data die erin komt
+    given_data = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"], key="file2") # dit is de data die erin komt
+    
     if uploaded_file is not None:
         try:
             # Probeer het Excel-bestand te lezen
-            data = pd.read_excel(uploaded_file)
+            bus_planning = pd.read_excel(uploaded_file)
+            time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
+            distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
             st.write("Geüpload bestand:")
-            st.dataframe(data)
+            st.dataframe(bus_planning)
 
             # Valideer de data
-            validation_errors = validate_schema(data)
+            validation_errors = validate_schema(bus_planning,time_table,distance_matrix)
             # Toon elke fout in de lijst als een foutmelding
 
             if validation_errors:
