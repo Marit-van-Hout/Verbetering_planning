@@ -582,7 +582,7 @@ def bus_checker_page():
             # Probeer het Excel-bestand te lezen
             bus_planning = pd.read_excel(uploaded_file)
             time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
-            distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
+            distance_matrix = pd.read_excel(given_data, sheet_name='Afstandsmatrix')
             st.write("Your Bus Planning:")
             st.dataframe(bus_planning)
 
@@ -627,7 +627,7 @@ def help_page():
     #return errors
 
 # Hoofd pagina selector
-page = st.sidebar.selectbox("Select a Page", ["Bus Planning Checker", "How It Works", "Help"])
+page = st.sidebar.selectbox("Select a Pagestr", ["Bus Planning Checker", "How It Works", "Help"])
 
 if page == "Bus Planning Checker":
     bus_checker_page()
