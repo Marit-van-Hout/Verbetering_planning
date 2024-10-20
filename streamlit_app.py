@@ -48,6 +48,8 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     distance_matrix['min_energy'] = distance_matrix['afstand in km'] * 0.7
     distance = distance_matrix['afstand in km']
 
+    start_tijden = []
+    eind_tijden = []
     start_times = time_table['vertrektijd']
     time_table['Row_Number'] = time_table.index + 1
     time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetime.strptime(x, '%H:%M'))
