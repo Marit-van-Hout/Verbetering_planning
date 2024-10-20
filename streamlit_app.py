@@ -48,24 +48,20 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     distance_matrix['min_energy'] = distance_matrix['afstand in km'] * 0.7
     distance = distance_matrix['afstand in km']
 
-    errors = []
-    start_tijden = []
-    eind_tijden = []
-
     start_times = time_table['vertrektijd']
     time_table['Row_Number'] = time_table.index + 1
     time_table['vertrektijd_dt'] = time_table['vertrektijd'].apply(lambda x: datetime.strptime(x, '%H:%M'))
     time_table['vertrektijd'] = pd.to_datetime(time_table['vertrektijd'], format='%H:%M', errors='coerce')
 
-
     # Functies
     def calculate_end_time(row):
-        """ Adds the mean travel time to the departure time to create a column with end time in dataframe time_table.
-        Parameters: row
+        """Adds the mean travel time to the departure time to create a column with end time in dataframe time_table.
+    
+        Parameters: row (DataFrame row)
         Output: end time in HH:MM
         """
         travel_time = distance_matrix[(distance_matrix['startlocatie'] == row['startlocatie']) & 
-                                  (distance_matrix['eindlocatie'] == row['eindlocatie'])]['mean reistijd in uur'].values
+                                      (distance_matrix['eindlocatie'] == row['eindlocatie'])]['mean reistijd in uur'].values
         if len(travel_time) > 0:  # Check if travel_time is not empty
             travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
             end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
@@ -76,40 +72,44 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
 
 
-    def simulate_battery(bus_planning, actual_capacity, start_time, end_time):
+    def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
         """Simulate battery usage throughout the day based on the bus planning."""
         battery = actual_capacity * 0.9
         min_battery = actual_capacity * 0.1
 
-        # Convert start and end times to datetime
+        # Iterate over each row in the bus planning
         for i, row in bus_planning.iterrows():
-            start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
-            end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
+            trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
         
             # Check if the trip is a regular or deadhead trip
-            if row['activiteit'] in ['dienst rit', 'materiaal rit']: # als activiteit dienst rit of materiaal rit is:
-                consumption = row['energieverbruik'] # dan kijken we naar de consuption rij van deze rit
-                battery -= consumption # dit gaat min de batterij die we al hebben
-                if battery < min_battery: # als de batterij minder dan 10 is 
-                    st.error(f'Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.')
-        
-            # Check if the bus has enough time to charge # dit klopt hememaal: Fleur
-            elif row['activiteit'] == 'opladen': # als de activiteit opladen is
-                idle_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
-                idle_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
-                idle_time = (idle_end_time - idle_start_time).total_seconds() / 60
+            if row['activiteit'] in ['dienst rit', 'materiaal rit']:
+                consumption = row['energieverbruik']  # Energy consumption for this trip
+                battery -= consumption  # Subtract from battery
+
+                # If the battery falls below the minimum threshold
+                if battery < min_battery:
+                    st.error(f"Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
+
+            # Check if the bus has enough time to charge
+            elif row['activiteit'] == 'opladen':  # Activity is charging
+                charging_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+                charging_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+                idle_time = (charging_end_time - charging_start_time).total_seconds() / 60  # Idle time in minutes
+
+                min_idle_time = 10  # Assuming 10 minutes is the minimum idle time required for charging
+
                 if idle_time >= min_idle_time:
-                    battery = charging(battery, actual_capacity, idle_start_time, start_time, end_time)
+                    battery = charging(battery, actual_capacity, charging_start_time, global_start_time, global_end_time)
                 else:
-                    st.error(f'Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.')
+                    st.error(f"Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
 
         # Ensure battery remains above 10%
         if battery < min_battery:
-            st.error(f'Battery too low after {row['starttijd']}.')
+            st.error(f"Battery too low after {row['starttijd']}.")
     
         return battery
 
-    
     
     def start_day(line):
         """
@@ -230,103 +230,70 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         return time_table['vertrektijd_dt'].iloc[-1].time()
 
 
-    def charging(battery, actual_capacity, current_time, start_times, end_time):
-        """
-        Simuleert het opladen van de batterij op basis van de huidige tijd en start- en eindtijden van de dienstregeling.
-    
-        Parameters:
-            battery (float): Huidige batterijcapaciteit.
-            actual_capacity (float): Totale capaciteit van de batterij.
-            current_time (datetime.time): Huidige tijd in het schema.
-            start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
-            end_time (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
-    
-        Returns:
-            float: Nieuwe batterijcapaciteit na opladen.
-        
-        Raises:
-            ValueError: Als er geen geldige start- of eindtijd wordt gevonden voor de huidige tijd.
-        """
+    def charging(battery, actual_capacity, current_time, start_times, end_times):
+        """Simulate battery charging."""
     
         min_battery = 0.10 * actual_capacity
         max_battery_day = 0.90 * actual_capacity
         max_battery_night = actual_capacity
-        charging_per_min = charging_speed_90
+        charging_per_min = charging_speed_90  # Assuming this is defined somewhere else in your code
     
-        # Zoek de juiste starttijd
+        # Get valid start and end times
         start_time = None
+        end_time = None
+    
         for line, locatie, tijd in start_times:
             if current_time >= tijd.time():
                 start_time = tijd
     
-        # Zoek de juiste eindtijd
-        end_time = None
-        for line, locatie, tijd in end_time:
+        for line, locatie, tijd in end_times:
             if current_time >= tijd.time():
                 end_time = tijd
     
-        # Controleer of start_time en end_time zijn gevonden
         if start_time is None:
-            st.error(f'Geen geldige starttijd gevonden voor de huidige tijd: {current_time}')
+            st.error(f"No valid start time found for current time: {current_time}")
         if end_time is None:
-            st.error(f'Geen geldige eindtijd gevonden voor de huidige tijd: {current_time}')
+            st.error(f"No valid end time found for current time: {current_time}")
     
-        # Bepaal maximum batterijlimiet op basis van de tijd
+        # Determine maximum battery capacity based on time of day
         if current_time < start_time.time() or current_time > end_time.time():
             max_battery = max_battery_night
         else:
             max_battery = max_battery_day
-
-        # Bereken de nieuwe batterijcapaciteit
+    
+        # Calculate new battery capacity
         charged_energy = min_idle_time * charging_per_min
         new_battery = battery + charged_energy if battery <= min_battery else battery
         return min(new_battery, max_battery)
 
 
-    def battery_consumption(distance, current_time, start_times, end_time):
-        """
-        Bereken het batterijverbruik op basis van de afstand en huidige tijd.
+    def battery_consumption(distance, current_time, start_times, end_times):
+        """Calculate battery consumption based on distance and current time."""
     
-        Parameters:
-            distance (float): Afstand in kilometers.
-            current_time (datetime.time): Huidige tijd in het schema.
-            start_times (list): Lijst van tuples met (line, locatie, tijd) voor starttijden.
-            end_time (list): Lijst van tuples met (line, locatie, tijd) voor eindtijden.
-    
-        Returns:
-            float: Resterende batterijcapaciteit na verbruik en opladen.
-        
-        Raises:
-            ValueError: Als er geen geldige start- of eindtijd wordt gevonden voor de huidige tijd.
-        """
-    
-        # Bepaal batterijcapaciteit voor de dag
+        # Assume max_capacity and consumption_per_km are defined globally
         battery_capacity = max_capacity * 0.9
-    
-        # Bereken het verbruik op basis van de afstand
         consumption = distance * np.mean(consumption_per_km)
         remaining_battery = battery_capacity - consumption
     
-        # Zoek de juiste starttijd
+        # Get valid start and end times
         start_time = None
+        end_time = None
+    
         for line, locatie, tijd in start_times:
             if current_time >= tijd.time():
                 start_time = tijd
     
-        # Zoek de juiste eindtijd
-        end_time = None
-        for line, locatie, tijd in end_time:
+        for line, locatie, tijd in end_times:
             if current_time >= tijd.time():
                 end_time = tijd
     
-        # Controleer of start_time en end_time zijn gevonden
         if start_time is None:
-            st.error(f'No valid start time founbd for current time {current_time}')
+            st.error(f"No valid start time found for current time {current_time}")
         if end_time is None:
-            st.error(f'No valid end time founbd for current time {current_time}')
+            st.error(f"No valid end time found for current time {current_time}")
     
-        # Roep de charging-functie aan om het resterende batterijpercentage bij te werken
-        return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
+        # Call the charging function to update the remaining battery
+        return charging(remaining_battery, battery_capacity, current_time, start_times, end_times)
 
 
     def check_route_continuity(bus_planning): # de bus kan niet vliegen
@@ -403,8 +370,11 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
     
         # Zorg ervoor dat de juiste datatypes zijn ingesteld
-        bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'])
-        bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'])
+        date_format = '%Y-%m-%d %H:%M:%S'  # Specify the date format of your columns
+
+        bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], format=date_format)
+        bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], format=date_format)
+
     
         # Bereken de duur in uren
         bus_planning['duration'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 3600
@@ -514,7 +484,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
 
     # De validatiefuncties aanroepen
     try:
-        end_time = calculate_end_time(time_table['Row_Number'])
+        time_table['end_time'] = time_table.apply(calculate_end_time, axis=1)
     except Exception as e:
         st.error(f'Something went wrong calculating the end time: {str(e)}')
     
@@ -538,19 +508,19 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         st.error(f'Something went wrong determining the current time: {str(e)}')
     
     try:
-        battery = simulate_battery(bus_planning, actual_capacity, time_table['vertrektijd'], end_time)
+        battery = simulate_battery(bus_planning, actual_capacity, time_table['vertrektijd'], time_table['eindtijd'])
     except Exception as e:
-        st.error(f'Something went wrong whil;e simulating the battery: {str(e)}')
+        st.error(f"Something went wrong while simulating the battery: {str(e)}")
     
     try:
-        charging(battery, actual_capacity, current_time_val, start_times, end_time)
+        charging(battery, actual_capacity, current_time_val, start_times, time_table['eindtijd'])
     except Exception as e:
-        st.error(f'Something went wrong charging the battery: {str(e)}')
+        st.error(f"Something went wrong charging the battery: {str(e)}")
     
     try:
-        battery_consumption(distance, current_time_val, start_times, end_time)
+        battery_consumption(distance, current_time_val, start_times, time_table['eindtijd'])
     except Exception as e:
-        st.error(f'Something went wrong calculating battery consumption: {str(e)}')
+        st.error(f"Something went wrong calculating battery consumption: {str(e)}")
     
     try:
         check_route_continuity(bus_planning)
@@ -582,11 +552,8 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     except Exception as e:
         st.error(f'Something went wrong deleting equal start and end times: {str(e)}')
     
-    return errors,start_tijden,eind_tijden
-
 # Display the logo
 st.image('tra_logo_rgb_HR.png', width=200)
-
 
 # Define Pages
 def bus_checker_page():
