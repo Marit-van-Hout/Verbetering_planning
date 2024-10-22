@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+from datetime import datetime
 
 # Load data
 #uploaded_file = pd.read_excel('omloopplanning.xlsx')
@@ -79,12 +79,39 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
     #print(time_table[['vertrektijd_dt', 'eindtijd']].head())  # Debugging
     time_table['eindtijd'] = time_table['eindtijd'].dt.strftime('%H:%M:%S')
+    # de eindtijd van de time table is goed. Nu gaan we kijken naar de eindtijd van de omloopplanning:
+    if bus_planning["eindtijd"].isna().any():
+        st.error("Error: Er zijn lege (NaN) waarden in de kolom 'eindtijd'. Controleer de busplanning.")
+
+    # Controleer of er NaN-waarden zijn in de kolom 'eindtijd'
+    if bus_planning["eindtijd"].isna().any():
+        print("Er zijn NaN-waarden in de kolom 'eindtijd'.")
+    else:
+        print("Geen NaN-waarden in de kolom 'eindtijd van de busplanning'.")
 
     # Controleer of er NaN-waarden zijn in de kolom 'eindtijd'
     if time_table['eindtijd'].isna().any():
         print("Er zijn NaN-waarden in de kolom 'eindtijd'.")
     else:
-        print("Geen NaN-waarden in de kolom 'eindtijd'.")
+        print("Geen NaN-waarden in de kolom 'eindtijd van de time_table'.")
+
+    # hier checken we of alle waarde in de busplanning ook goede waarde zijn: dit is zo. Bron:terminal
+    def check_time_format(time_str):
+        try:
+            # Probeer elke waarde te parsen volgens het '%H:%M:%S' formaat
+            datetime.strptime(time_str, '%H:%M:%S')
+            return True
+        except ValueError:
+            return False
+
+    # Controleer of alle waarden in het juiste formaat zijn
+    invalid_times = bus_planning[~bus_planning["eindtijd"].apply(check_time_format)]
+
+    # Als er ongeldige tijden zijn, geef een foutmelding
+    if not invalid_times.empty:
+        raise ValueError(f"Error: De volgende rijen hebben een onjuist tijdformaat: {invalid_times.index.tolist()}")
+    else:
+        print("Alle eindtijden zijn in het juiste formaat.")
 
     def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
         """Simulate battery usage throughout the day based on the bus planning."""
@@ -95,7 +122,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         for i, row in bus_planning.iterrows():
             trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
             trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
-
+            # hier "trip_end_time" gaat het al mis en ik snap niet waarom.
             try:
                 trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
             except (KeyError, ValueError) as e:
@@ -331,6 +358,10 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         new_battery = battery + charged_energy if battery <= min_battery else battery
         return min(new_battery, max_battery)
     
+    # waarom ik hier de start van de dag gebruik die we berekend hebben in de funtie start_day(time_table)
+    # is omdat we niet mogen uitgaan van de gegevens in de omloopplanning. 
+    # Deze funtie berekend het opladen van de baterij los van wat er in de omloopplanning staat.
+    # want het is ook de bedoeling dat we niets aannemen van de omloopplanning. We checken het alleen maar.
     def charging(battery, actual_capacity, current_time, start_times_dag, end_times_dag):
         """
         Simuleer het opladen van de batterij.
@@ -351,6 +382,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         max_battery_day = 0.90 * actual_capacity
         max_battery_night = actual_capacity
         charging_per_min = charging_speed_90  # Dit wordt elders in je code gedefinieerd
+        min_idle_time = 15
     
         # Zoek naar geldige start- en eindtijden op basis van de huidige tijd
         start_time = None
@@ -611,13 +643,11 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         st.error(f'Something went wrong calculating the end time: {str(e)}')
 
     try: 
-        # Roep de functie aan voor beide buslijnen
         start_day(time_table)
     except Exception as e:
         st.error(f'Something went wrong calculating the start of day: {str(e)}')
 
     try: 
-        # Roep de functie aan voor beide buslijnen
         end_day(time_table)
     except Exception as e:
         st.error(f'Something went wrong calculating the end of day: {str(e)}')
@@ -633,12 +663,12 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         st.error(f"Something went wrong while simulating the battery: {str(e)}")
     
     try:
-        charging(battery, actual_capacity, current_time_val, start_tijden,eind_tijden)
+        charging(battery, actual_capacity, current_time_val, start_tijden, eind_tijden)
     except Exception as e:
         st.error(f"Something went wrong charging the battery: {str(e)}")
     
     try:
-        battery_consumption(distance, current_time_val, start_times, time_table['eindtijd'])
+        battery_consumption(distance, current_time_val, start_tijden, eind_tijden )
     except Exception as e:
         st.error(f"Something went wrong calculating battery consumption: {str(e)}")
     
