@@ -358,10 +358,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         new_battery = battery + charged_energy if battery <= min_battery else battery
         return min(new_battery, max_battery)
     
-    # waarom ik hier de start van de dag gebruik die we berekend hebben in de funtie start_day(time_table)
-    # is omdat we niet mogen uitgaan van de gegevens in de omloopplanning. 
-    # Deze funtie berekend het opladen van de baterij los van wat er in de omloopplanning staat.
-    # want het is ook de bedoeling dat we niets aannemen van de omloopplanning. We checken het alleen maar.
+
     def charging(battery, actual_capacity, current_time, start_times_dag, end_times_dag):
         """
         Simuleer het opladen van de batterij.
