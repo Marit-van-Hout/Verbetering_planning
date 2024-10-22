@@ -67,12 +67,21 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         if len(travel_time) > 0:  # Check if travel_time is not empty
             travel_time_in_min = travel_time[0] * 60  # Convert travel time to minutes
             end_time = row['vertrektijd_dt'] + timedelta(minutes=travel_time_in_min)
+            #print(f"End time for row {row.name}: {end_time}")  # Debugging print statement
             return end_time
         else:
             return None
 
+    # Apply the function and check if 'eindtijd' is properly populated
     time_table['eindtijd'] = time_table.apply(calculate_end_time, axis=1)
+    #print(time_table[['vertrektijd_dt', 'eindtijd']].head())  # Debugging
+    time_table['eindtijd'] = time_table['eindtijd'].dt.strftime('%H:%M:%S')
 
+    # Controleer of er NaN-waarden zijn in de kolom 'eindtijd'
+    if time_table['eindtijd'].isna().any():
+        print("Er zijn NaN-waarden in de kolom 'eindtijd'.")
+    else:
+        print("Geen NaN-waarden in de kolom 'eindtijd'.")
 
     def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
         """Simulate battery usage throughout the day based on the bus planning."""
@@ -83,6 +92,12 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         for i, row in bus_planning.iterrows():
             trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
             trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
+
+            try:
+                trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            except (KeyError, ValueError) as e:
+                st.error(f"Invalid 'eindtijd' in row {i}: {e}")
+                continue  # Skip this row if there's an error
         
             # Check if the trip is a regular or deadhead trip
             if row['activiteit'] in ['dienst rit', 'materiaal rit']:
@@ -489,7 +504,11 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         time_table['end_time'] = time_table.apply(calculate_end_time, axis=1)
     except Exception as e:
         st.error(f'Something went wrong calculating the end time: {str(e)}')
-    
+    try:
+        calculate_end_time(time_table['Row_Number']):
+    except Exception as e:
+        st.error(f'Something went wrong calculating the end time: {str(e)}')
+        
     try: 
         # Roep de functie aan voor beide buslijnen
         start_day(400)
