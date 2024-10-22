@@ -500,15 +500,16 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         return clean_bus_planning
 
     # De validatiefuncties aanroepen
+    #try:
+        #time_table['end_time'] = time_table.apply(calculate_end_time, axis=1)
+    #except Exception as e:
+        #st.error(f'Something went wrong calculating the end time: {str(e)}')
+    
     try:
-        time_table['end_time'] = time_table.apply(calculate_end_time, axis=1)
+        calculate_end_time(time_table['Row_Number'])
     except Exception as e:
-        st.error(f'Something went wrong calculating the end time: {str(e)}')
-    try:
-        calculate_end_time(time_table['Row_Number']):
-    except Exception as e:
-        st.error(f'Something went wrong calculating the end time: {str(e)}')
-        
+        st.error(f'Something went wrong calculating the end time functie calculate_end_time: {str(e)}')
+
     try: 
         # Roep de functie aan voor beide buslijnen
         start_day(400)
