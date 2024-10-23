@@ -317,6 +317,83 @@ def validate_schema(row: dict,uploaded_file, actual_capacity,
     
         # Roep de charging-functie aan om het resterende batterijpercentage bij te werken
         return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
+    
+    # dit is de goede versie misschien. Goed op letten 
+    def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
+        """Simulate battery usage throughout the day based on the bus planning."""
+        battery = actual_capacity * 0.9
+        min_battery = actual_capacity * 0.1
+
+        # Iterate over each row in the bus planning
+        for i, row in bus_planning.iterrows():
+            try:
+                trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            except (KeyError, ValueError) as e:
+                st.error(f"Invalid 'eindtijd' in row {i}: {e}")
+                continue  # Skip this row if there's an error
+            
+            trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
+            trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
+            # hier "trip_end_time" gaat het al mis en ik snap niet waarom.
+            try:
+                trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            except (KeyError, ValueError) as e:
+                st.error(f"Invalid 'eindtijd' in row {i}: {e}")
+                continue  # Skip this row if there's an error
+        
+            # Check if the trip is a regular or deadhead trip
+            if row['activiteit'] in ['dienst rit', 'materiaal rit']:
+                consumption = row['energieverbruik']  # Energy consumption for this trip
+                battery -= consumption  # Subtract from battery
+
+                # If the battery falls below the minimum threshold
+                if battery < min_battery:
+                    st.error(f"Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
+
+            # Check if the bus has enough time to charge
+            elif row['activiteit'] == 'opladen':  # Activity is charging
+                charging_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+                charging_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+                idle_time = (charging_end_time - charging_start_time).total_seconds() / 60  # Idle time in minutes
+
+                min_idle_time = 15  # Assuming 10 minutes is the minimum idle time required for charging
+
+                if idle_time >= min_idle_time:
+                    battery = charging(battery, actual_capacity, charging_start_time, global_start_time, global_end_time)
+                else:
+                    st.error(f"Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
+
+        # Ensure battery remains above 10%
+        if battery < min_battery:
+            st.error(f"Battery too low after {row['starttijd']}.")
+    
+        return battery
+    
+    # Deze funtie is misschien goed:
+    def check_route_continuity(bus_planning): # de bus kan niet vliegen
+        """
+        Check if the endpoint of route n matches the start point of route n+1.
+        Parameters:
+         - bus_planning: DataFrame with route data.
+        Output: Print messages if there are inconsistencies.
+        """
+        
+        for i in range(len(bus_planning) - 1): 
+            current_end_location = bus_planning.iloc[i]['eindlocatie']
+            next_start_location = bus_planning.iloc[i + 1]['startlocatie']
+            omloop_nummer = bus_planning.iloc[i].get('omloop nummer')
+        
+            if omloop_nummer is None:
+                st.error("Kolom 'omloop nummer' niet gevonden")
+            else:
+                st.error(f'Route continuity issue between {omloop_nummer:.0f} ending at {current_end_location} and next route starting at {next_start_location}.')
+            
+            if current_end_location != next_start_location:
+                omloop_nummer = bus_planning.iloc[i]['omloop nummer']
+                st.error(f'Route continuity issue between {omloop_nummer:.0f} ending at {current_end_location} and next route starting at {next_start_location}.')
+                return False
+           
+        return True
 
     def check_route_continuity(bus_planning): # de bus kan niet vliegen
         """

@@ -114,6 +114,24 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     else:
         print("Alle eindtijden zijn in het juiste formaat.")
 
+    print("dit is hoeveel waarde ontbreken:",bus_planning['eindtijd'].isnull().sum())  # Geeft aantal ontbrekende waarden
+    bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], format='%H:%M:%S', errors='coerce')
+    invalid_times = bus_planning[bus_planning['eindtijd'].isna()]
+    print("invalid times slayyyy:",invalid_times)  # Print rijen met ongeldige tijden
+
+
+    # Zorg ervoor dat 'eindtijd' correct wordt omgezet naar datetime, en behandel fouten
+    bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], format='%H:%M:%S', errors='coerce')
+
+    # Controleer of er NaT (Not a Time) waarden zijn in 'eindtijd'
+    invalid_times = bus_planning[bus_planning['eindtijd'].isna()]
+
+    if not invalid_times.empty:
+        st.error(f"Er zijn ongeldige 'eindtijd' waarden in de volgende rijen: {invalid_times.index.tolist()}")
+        print(invalid_times[['eindtijd']])  # Toon de problematische waarden
+    else:
+        st.success("Alle 'eindtijd'-waarden zijn geldig.") # er is niets mis met de waarde. Waarom doet hij het niet???????
+    
     def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
         """Simulate battery usage throughout the day based on the bus planning."""
         battery = actual_capacity * 0.9
@@ -158,8 +176,6 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     
         return battery
 
-    # Van Fleur naar Fleur: fleur dit is niet wat je wil hebben.
-    # je wil dat het lijkt per
     def start_day(time_table):
         """
         Deze functie berekent voor elke unieke combinatie van startlocatie en buslijn de starttijd van de dag.
@@ -443,20 +459,39 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         return charging(remaining_battery, battery_capacity, current_time, start_times, end_times)
 
 
+    # Something went wrong checking route continuity: 'omloop nummer'
     def check_route_continuity(bus_planning): # de bus kan niet vliegen
         """
         Check if the endpoint of route n matches the start point of route n+1.
         Parameters:
-         - bus_planning: DataFrame with route data.
+        - bus_planning: DataFrame with route data.
         Output: Print messages if there are inconsistencies.
         """
-        for i in range(len(bus_planning) - 1): 
-            current_end_location = bus_planning.iloc[i]['eindlocatie']
-            next_start_location = bus_planning.iloc[i + 1]['startlocatie']
-            if current_end_location != next_start_location:
-                st.error(f'Route continuity issue between {bus_planning.iloc[i]['omloop nummer']:.0f} ending at {current_end_location} and next route starting at {next_start_location}.')
+    
+        # Check of de kolom 'omloop nummer' en andere benodigde kolommen bestaan
+        required_columns = ['eindlocatie','omloop nummer', 'startlocatie']
+        for col in required_columns:
+            if col not in bus_planning.columns:
+                st.error(f"Kolom '{col}' ontbreekt in de busplanning.") # waarom ontbreekt dit????
                 return False
-           
+
+        # Controleer of er NaN-waarden zijn in de kolom 'omloop nummer'
+        if bus_planning['omloop nummer'].isna().any():
+            st.error("Er zijn NaN-waarden in de kolom 'omloop nummer'.")
+            return False
+        else:
+            print("Geen NaN-waarden in de kolom 'omloop nummer van de busplanning'.")
+
+        # Controleer de continuïteit van de routes
+        for i in range(len(bus_planning) - 1): 
+            current_end_location = bus_planning.at[i, 'eindlocatie']
+            next_start_location = bus_planning.at[i + 1, 'startlocatie']
+            omloop_nummer = bus_planning.at[i, 'omloop nummer']
+
+            if current_end_location != next_start_location:
+                st.error(f'Route continuity issue between omloop nummer {omloop_nummer:.0f}, ending at {current_end_location} and next route starting at {next_start_location}.')
+                return False
+       
         return True
 
 
@@ -671,7 +706,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         st.error(f"Something went wrong calculating battery consumption: {str(e)}")
     
     try:
-        check_route_continuity(bus_planning)
+        check_route_continuity(bus_planning) 
     except Exception as e:
         st.error(f'Something went wrong checking route continuity: {str(e)}')
     
