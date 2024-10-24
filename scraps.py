@@ -17,7 +17,7 @@
 
     #return errors
     
-    def start_day(line):
+def start_day(line):
         """
         Deze functie kijkt naar de kolom 'startlocatie' in time_table. 
         Voor elke lijn wordt de tijd van een rit met materiaal (buslijn = NaN) vanuit 'ehvgar' 
@@ -58,6 +58,33 @@
         else:
             st.error("No riseds found for bus line", line)
 
+    def battery_consumption(distance, current_time, start_times, end_times):
+        """Calculate battery consumption based on distance and current time."""
+    
+        # Assume max_capacity and consumption_per_km are defined globally
+        battery_capacity = max_capacity * 0.9
+        consumption = distance * np.mean(consumption_per_km)
+        remaining_battery = battery_capacity - consumption
+    
+        # Get valid start and end times
+        start_time = None
+        end_time = None
+    
+        for line, locatie, tijd in start_times:
+            if current_time >= tijd.time():
+                start_time = tijd
+    
+        for line, locatie, tijd in end_times:
+            if current_time >= tijd.time():
+                end_time = tijd
+    
+        if start_time is None:
+            st.error(f"No valid start time found for current time {current_time}")
+        if end_time is None:
+            st.error(f"No valid end time found for current time {current_time}")
+    
+        # Call the charging function to update the remaining battery
+        return charging(remaining_battery, battery_capacity, current_time, start_times, end_times)
 
     def charging(battery, actual_capacity, current_time, start_times, end_time):
         """

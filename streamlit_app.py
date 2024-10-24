@@ -140,8 +140,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         # Iterate over each row in the bus planning
         for i, row in bus_planning.iterrows():
             trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
-            trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
-            # hier "trip_end_time" gaat het al mis en ik snap niet waarom.
+            #trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  trip end time staat eerder in de code ookal uitgelegd
             try:
                 trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
             except (KeyError, ValueError) as e:
@@ -431,31 +430,25 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         return min(new_battery, max_battery)
 
     def battery_consumption(distance, current_time, start_times, end_times):
-        """Calculate battery consumption based on distance and current time."""
+    """Calculate battery consumption based on distance and current time."""
     
-        # Assume max_capacity and consumption_per_km are defined globally
+        # Stel de batterijcapaciteit en het verbruik per kilometer in
         battery_capacity = max_capacity * 0.9
         consumption = distance * np.mean(consumption_per_km)
         remaining_battery = battery_capacity - consumption
-    
-        # Get valid start and end times
-        start_time = None
-        end_time = None
-    
-        for line, locatie, tijd in start_times:
-            if current_time >= tijd.time():
-                start_time = tijd
-    
-        for line, locatie, tijd in end_times:
-            if current_time >= tijd.time():
-                end_time = tijd
-    
+
+        # Haal geldige start- en eindtijden op
+        start_time = next((tijd for line, locatie, tijd in start_times if current_time >= tijd.time()), None)
+        end_time = next((tijd for line, locatie, tijd in end_times if current_time >= tijd.time()), None)#Het zegt dat end_times niet wordt herkent, maar start_times wel?
+
         if start_time is None:
-            st.error(f"No valid start time found for current time {current_time}")
+         st.error(f"No valid start time found for current time {current_time}")
+            return remaining_battery  # Retourneer huidige batterijcapaciteit
         if end_time is None:
             st.error(f"No valid end time found for current time {current_time}")
-    
-        # Call the charging function to update the remaining battery
+            return remaining_battery  # Retourneer huidige batterijcapaciteit
+
+        # Roep de charging functie aan om de resterende batterij bij te werken
         return charging(remaining_battery, battery_capacity, current_time, start_times, end_times)
 
 
@@ -470,17 +463,22 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     
         # Check of de kolom 'omloop nummer' en andere benodigde kolommen bestaan
         required_columns = ['eindlocatie','omloop nummer', 'startlocatie']
-        for col in required_columns:
-            if col not in bus_planning.columns:
-                st.error(f"Kolom '{col}' ontbreekt in de busplanning.") # waarom ontbreekt dit????
-                return False
-
-        # Controleer of er NaN-waarden zijn in de kolom 'omloop nummer'
-        if bus_planning['omloop nummer'].isna().any():
-            st.error("Er zijn NaN-waarden in de kolom 'omloop nummer'.")
+        missing_columns = [col for col in required_columns if col not in bus_planning.columns]#Is ervoor om het probleem sneller te vinden en aan te pakken
+        if missing_columns:
+            st.error(f"Missing columns in bus planning: {', '.join(missing_columns)}")
             return False
-        else:
-            print("Geen NaN-waarden in de kolom 'omloop nummer van de busplanning'.")
+        if bus_planning['omloop nummer'].isna().any():
+            st.error("NaN values found in 'omloop nummer' column.")
+            return False
+        for i in range(len(bus_planning) - 1): 
+            current_end_location = bus_planning.at[i, 'eindlocatie']
+            next_start_location = bus_planning.at[i + 1, 'startlocatie']
+            omloop_nummer = bus_planning.at[i, 'omloop nummer']
+
+            if current_end_location != next_start_location:
+                st.error(f'Route continuity issue between omloop nummer {omloop_nummer:.0f}: ends at {current_end_location} and next route starts at {next_start_location}.')
+                return False
+            return True
 
         # Controleer de continuïteit van de routes
         for i in range(len(bus_planning) - 1): 
