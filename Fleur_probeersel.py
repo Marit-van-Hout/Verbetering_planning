@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from io import StringIO
 from datetime import datetime, timedelta
+from wiskundig_model import charging
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
@@ -15,8 +17,8 @@ import statsmodels.api as sm
 #new_planning = remove_startingtime_endtime_equal(bus_planning)
 # wat is het verschil tussen de uploaded_file en de bus_planning?
 
-def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_capacity, 
-                   distance, bus_planning, scheduled_orders, distance_matrix) -> list[str]:
+def validate_schema(row: dict,uploaded_file, actual_capacity, 
+                   distance, bus_planning, scheduled_orders) -> list[str]:
     """
     Valideert het schema van een busplanning.
 
@@ -315,6 +317,83 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
         # Roep de charging-functie aan om het resterende batterijpercentage bij te werken
         return charging(remaining_battery, battery_capacity, current_time, start_time, end_time)
+    
+    # dit is de goede versie misschien. Goed op letten 
+    def simulate_battery(bus_planning, actual_capacity, global_start_time, global_end_time):
+        """Simulate battery usage throughout the day based on the bus planning."""
+        battery = actual_capacity * 0.9
+        min_battery = actual_capacity * 0.1
+
+        # Iterate over each row in the bus planning
+        for i, row in bus_planning.iterrows():
+            try:
+                trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            except (KeyError, ValueError) as e:
+                st.error(f"Invalid 'eindtijd' in row {i}: {e}")
+                continue  # Skip this row if there's an error
+            
+            trip_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')  # Renamed to avoid conflict
+            trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')  # Renamed to avoid conflict
+            # hier "trip_end_time" gaat het al mis en ik snap niet waarom.
+            try:
+                trip_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            except (KeyError, ValueError) as e:
+                st.error(f"Invalid 'eindtijd' in row {i}: {e}")
+                continue  # Skip this row if there's an error
+        
+            # Check if the trip is a regular or deadhead trip
+            if row['activiteit'] in ['dienst rit', 'materiaal rit']:
+                consumption = row['energieverbruik']  # Energy consumption for this trip
+                battery -= consumption  # Subtract from battery
+
+                # If the battery falls below the minimum threshold
+                if battery < min_battery:
+                    st.error(f"Battery of bus {row['omloop nummer']:.0f} too low at {row['starttijd']}.")
+
+            # Check if the bus has enough time to charge
+            elif row['activiteit'] == 'opladen':  # Activity is charging
+                charging_start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+                charging_end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+                idle_time = (charging_end_time - charging_start_time).total_seconds() / 60  # Idle time in minutes
+
+                min_idle_time = 15  # Assuming 10 minutes is the minimum idle time required for charging
+
+                if idle_time >= min_idle_time:
+                    battery = charging(battery, actual_capacity, charging_start_time, global_start_time, global_end_time)
+                else:
+                    st.error(f"Charging time too short between {row['starttijd']} and {row['eindtijd']}, only {idle_time} minutes.")
+
+        # Ensure battery remains above 10%
+        if battery < min_battery:
+            st.error(f"Battery too low after {row['starttijd']}.")
+    
+        return battery
+    
+    # Deze funtie is misschien goed:
+    def check_route_continuity(bus_planning): # de bus kan niet vliegen
+        """
+        Check if the endpoint of route n matches the start point of route n+1.
+        Parameters:
+         - bus_planning: DataFrame with route data.
+        Output: Print messages if there are inconsistencies.
+        """
+        
+        for i in range(len(bus_planning) - 1): 
+            current_end_location = bus_planning.iloc[i]['eindlocatie']
+            next_start_location = bus_planning.iloc[i + 1]['startlocatie']
+            omloop_nummer = bus_planning.iloc[i].get('omloop nummer')
+        
+            if omloop_nummer is None:
+                st.error("Kolom 'omloop nummer' niet gevonden")
+            else:
+                st.error(f'Route continuity issue between {omloop_nummer:.0f} ending at {current_end_location} and next route starting at {next_start_location}.')
+            
+            if current_end_location != next_start_location:
+                omloop_nummer = bus_planning.iloc[i]['omloop nummer']
+                st.error(f'Route continuity issue between {omloop_nummer:.0f} ending at {current_end_location} and next route starting at {next_start_location}.')
+                return False
+           
+        return True
 
     def check_route_continuity(bus_planning): # de bus kan niet vliegen
         """
@@ -383,74 +462,52 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
         if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
             return "Bus planning is equal to time table"
 
-    def plot_schedule_from_excel(uploaded_file):
-     """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
+    def plot_schedule(scheduled_orders):
+        """Plots a Gantt chart of the scheduled orders
+
+        Args:
+            scheduled_orders (dict): every order, their starting time, end time, on which machine and set-up time
+        """    
+        fig, ax = plt.subplots(figsize=(10, 6))
     
-      # Zorg ervoor dat de juiste datatypes zijn ingesteld
-        uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'])
-        uploaded_file['eindtijd'] = pd.to_datetime(uploaded_file['eindtijd'])
+        y_pos = 0
     
-        # Bereken de duur in uren
-        uploaded_file['duration'] = (uploaded_file['eindtijd'] - uploaded_file['starttijd']).dt.total_seconds() / 3600
-
-    # Kleurmap voor verschillende buslijnen
-    color_map = {
-        '400.0': 'blue',
-        '401.0': 'yellow'
-    }
-
-    # Zet de buslijnwaarden om naar strings
-    uploaded_file['buslijn'] = uploaded_file['buslijn'].astype(str)
-
-    # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
-    uploaded_file['color'] = uploaded_file['buslijn'].map(color_map).fillna('gray')
-
-    # Maak een figuur voor het plotten
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Omloopnummers op de Y-as
-    omloopnummers = uploaded_file['omloop nummer'].unique()
-    omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
-
-    # Loop door de unieke omloopnummers
-    for omloop in omloopnummers:
-        trips = uploaded_file[uploaded_file['omloop nummer'] == omloop]
-        
-        # Controleer of er ritten zijn
-        if trips.empty:
-            # Voeg een zwart blok toe als er geen ritten zijn
-            ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
-            continue
-        
-        # Plot elke trip voor de huidige omloop
-        for _, trip in trips.iterrows():
-            starttime = trip['starttijd']
-            duration = trip['duration']
-            color = trip['color']  # Haal de kleur direct uit de DataFrame
-
-            # Plot de busrit als een horizontale balk
-            ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
-                    color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else "")
+        # Colors for visualization
+        color_map = {
+            '400': 'blue',
+            '401': 'yellow',
+        }
     
-    # Zet de Y-ticks en labels voor de omloopnummers
-    ax.set_yticks(list(omloop_indices.values()))
-    ax.set_yticklabels(list(omloop_indices.keys()))
+        for machine, orders in scheduled_orders.items():
+            y_pos += 1  # Voor elke machine
+            for order in orders:
+                order_color = order['colour']
+                processing_time = order['end_time'] - order['start_time'] - order['setup_time']
+                setup_time = order['setup_time']
+                start_time = order['start_time']
+            
+                # Controleer of de kleur aanwezig is in de color_map
+                if order_color in color_map:
+                    color = color_map[order_color]
+                else:
+                    color = 'black'  # Default color als de kleur niet bestaat in color_map
+            
+                # Teken verwerkingstijd
+                ax.barh(y_pos, processing_time, left=start_time + setup_time, color=color, edgecolor='black')
+                ax.text(start_time + setup_time + processing_time / 2, y_pos, f"Order {order['order']}", 
+                        ha='center', va='center', color='black', rotation=90)
 
-        # Set axis labels and title
-        ax.set_xlabel('Time (hours)')
-        ax.set_ylabel('Omloopnummer')
-        ax.set_title('Gantt Chart for Bus Scheduling')
-
-    # Voeg een legenda toe (voorkom dubbele labels)
-       handles, labels = ax.get_legend_handles_labels()
-        unique_labels = dict(zip(labels, handles))
-       ax.legend(unique_labels.values(), unique_labels.keys(), title='Buslijnen')
-
+                # Teken setup tijd
+                if setup_time > 0:
+                    ax.barh(y_pos, setup_time, left=start_time, color='gray', edgecolor='black', hatch='//')
+    
+        ax.set_yticks(range(1, len(scheduled_orders) + 1))
+        ax.set_yticklabels([f"Machine {m}" for m in scheduled_orders.keys()])
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Machines')
+        ax.set_title('Gantt Chart for Paint Shop Scheduling')
         plt.show()
 
-    # Voorbeeld van aanroepen van de functie (upload je DataFrame)
-    plot_schedule_from_excel(uploaded_file)
-        
     def check_travel_time(bus_planning, distance_matrix):
         """
         Check if the time difference between the start time and end time in bus planning
@@ -570,9 +627,9 @@ def validate_schema(row: dict, time_table: pd.DataFrame, uploaded_file, actual_c
     
     return errors,start_tijden,eind_tijden
 
-st.title("🎈 Oploopschema Validatie App")
+st.title("🎈 Bus planning checker app")
 st.write(
-    "Upload je oploopschema (CSV of Excel) en download het gevalideerde schema."
+    "Upload your bus planning (CSV or Excel) and download the validated schedule."
 ) 
 
 # Display the logo
@@ -581,7 +638,7 @@ st.image("logo_transdev_klein.png", width=200)
 # Define pages
 def bus_checker_page():
     st.title("🚌 Bus Planning Checker")
-    st.write("Deze pagina stelt je in staat om het busplanningsschema te controleren.")
+    st.write("This page ensures that you can check your planning.")
 
     # Bestand uploaden
     uploaded_file = st.file_uploader("Upload een Excel-bestand (xlsx)", type=["xlsx"]) # dit is de data die erin komt
@@ -608,11 +665,11 @@ def bus_checker_page():
 
 def how_it_works_page():
     st.title("📖 How It Works")
-    st.write("Deze sectie legt uit hoe de applicatie werkt.")
+    st.write("This section explains how it works.")
 
 def help_page():
     st.title("❓ Help")
-    st.write("Deze pagina biedt hulp en ondersteuning.")
+    st.write("This page gives help to the people who need it.")
 
 # Functie om het busplanningsschema te valideren
 #def validate_bus_planning(data):
