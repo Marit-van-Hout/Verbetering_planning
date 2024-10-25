@@ -29,7 +29,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     - Een lijst van foutmeldingen die zijn opgetreden tijdens de validatie.
     """
 
-    errors = []
+    error = []
 
     # Parameters
     max_capacity = 300 # maximum capacity in kWh
@@ -42,62 +42,62 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     # daytime_limit = actual_capacity * 0.9 (wordt niet gebruikt)
     
     import pandas as pd
-from datetime import datetime
+    from datetime import datetime
 
-def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, min_batterij=30):
-    df = pd.merge(uploaded_file, distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='left')
+    def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, min_batterij=30):
+        df = pd.merge(uploaded_file, distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='left')
 
-    # Consumptie voor kilometers
-    consumption_per_km = (0.7 + 2.5) / 2  
-    df['consumptie_kWh'] = (df['afstand in meters'] / 1000) * consumption_per_km
+        # Consumptie voor kilometers
+        consumption_per_km = (0.7 + 2.5) / 2  
+        df['consumptie_kWh'] = (df['afstand in meters'] / 1000) * consumption_per_km
 
-    # Consumptie voor idle activiteiten
-    df.loc[df['activiteit'] == 'idle', 'consumptie_kWh'] = 0.01
+        # Consumptie voor idle activiteiten
+        df.loc[df['activiteit'] == 'idle', 'consumptie_kWh'] = 0.01
 
-    # Laadsnelheden instellen
-    charging_speed_90 = 450 / 60  # kWh per minuut voor opladen tot 90%
-    charging_speed_10 = 60 / 60   # kWh per minuut voor opladen van 90% tot 100%
+        # Laadsnelheden instellen
+        charging_speed_90 = 450 / 60  # kWh per minuut voor opladen tot 90%
+        charging_speed_10 = 60 / 60   # kWh per minuut voor opladen van 90% tot 100%
 
-    # Beginwaarden
-    battery_level = start_batterij
-    vorig_omloopnummer = df['omloop nummer'].iloc[0]
+        # Beginwaarden
+        battery_level = start_batterij
+        vorig_omloopnummer = df['omloop nummer'].iloc[0]
 
-    # Itereren door de DataFrame
-    for i, row in df.iterrows():
-        # Controleer of het een nieuwe omloop is
-        if row['omloop nummer'] != vorig_omloopnummer:
-            # Energieverbruik afhalen vóór het resetten van de batterij
-            battery_level -= row['consumptie_kWh']
+        # Itereren door de DataFrame
+        for i, row in df.iterrows():
+            # Controleer of het een nieuwe omloop is
+            if row['omloop nummer'] != vorig_omloopnummer:
+                # Energieverbruik afhalen vóór het resetten van de batterij
+                battery_level -= row['consumptie_kWh']
             
-            # Reset de batterij naar start_batterij
-            battery_level = start_batterij
+                # Reset de batterij naar start_batterij
+                battery_level = start_batterij
 
-        # Opladen
-        if row['activiteit'] == 'opladen':
-            # Start- en eindtijd ophalen en de duur berekenen
-            start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
-            end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
-            charging_duration = (end_time - start_time).total_seconds() / 60
+            # Opladen
+            if row['activiteit'] == 'opladen':
+                # Start- en eindtijd ophalen en de duur berekenen
+                start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
+                end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+                charging_duration = (end_time - start_time).total_seconds() / 60
 
-            # Bepaal de laadsnelheid
-            if battery_level <= 243:
-                charge_power = charging_speed_90 * charging_duration
+                # Bepaal de laadsnelheid
+                if battery_level <= 243:
+                    charge_power = charging_speed_90 * charging_duration
+                else:
+                    charge_power = charging_speed_10 * charging_duration
+
+                # Opladen en aanpassen van de batterijstatus
+                battery_level += charge_power
+
             else:
-                charge_power = charging_speed_10 * charging_duration
+                # Verminderen met de consumptie
+                battery_level -= row['consumptie_kWh']
 
-            # Opladen en aanpassen van de batterijstatus
-            battery_level += charge_power
+            # Controleer of de batterijstatus onder het minimum komt
+            if battery_level < min_batterij:
+                st.error(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
 
-        else:
-            # Verminderen met de consumptie
-            battery_level -= row['consumptie_kWh']
-
-        # Controleer of de batterijstatus onder het minimum komt
-        if battery_level < min_batterij:
-            st.error(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
-
-        # Bij nieuwe omloop het omloopnummer updaten
-        vorig_omloopnummer = row['omloop nummer']
+            # Bij nieuwe omloop het omloopnummer updaten
+            vorig_omloopnummer = row['omloop nummer']
 
 
     # Something went wrong checking route continuity: 'omloop nummer'
@@ -237,7 +237,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
         #st.error(f'Something went wrong calculating the end time: {str(e)}')
         
     try: 
-        check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, min_batterij=30)
+        check_batterij_status(bus_planning, distance_matrix, start_batterij=270, min_batterij=30)
     except Exception as e:
         st.error(f'Something went wrong checking battery: {str(e)}')
     
@@ -266,7 +266,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
     except Exception as e:
         st.error(f'Something went wrong checking the travel time: {str(e)}')
     
-    return errors
+    return error
     
 def plot_schedule_from_excel(bus_planning):
         """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
