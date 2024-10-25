@@ -200,3 +200,14 @@ def start_day(line):
                 return False
            
         return True
+
+def remove_startingtime_endtime_equal(bus_planning): 
+        """ If the starting time and end time are equal, the row is removed.
+        Parameters: 
+            bus_planning: DataFrame
+                Whole bus planning.
+        Output: DataFrame
+            Clean DataFrame.
+        """
+        clean_bus_planning = bus_planning[bus_planning['starttijd'] != bus_planning['eindtijd']]
+        return clean_bus_planning
