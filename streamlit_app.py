@@ -155,6 +155,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         clean_bus_planning = clean_bus_planning.dropna(subset=['buslijn']) # dropt alle rijen die geen buslijn hebben
         return clean_bus_planning
     
+    
     bus_planning = driven_rides(bus_planning)
 
 
@@ -268,73 +269,76 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     
     return error
     
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import streamlit as st
+
 def plot_schedule_from_excel(bus_planning):
-        """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
-    
-        # Zorg ervoor dat de juiste datatypes zijn ingesteld
-        date_format = '%Y-%m-%d %H:%M:%S'  # Specify the date format of your columns
+    """Plot een Gantt-grafiek voor busplanning op basis van een DataFrame in Streamlit."""
 
-        bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], format=date_format)
-        bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], format=date_format)
+    # Zorg ervoor dat de juiste datatypes zijn ingesteld
+    bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
+    bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], errors='coerce')
 
-    
-        # Bereken de duur in uren
-        bus_planning['duration'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 3600
+    # Bereken de duur in uren
+    bus_planning['duration'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 3600
 
-        # Kleurmap voor verschillende buslijnen
-        color_map = {
-            '400.0': 'blue',
-            '401.0': 'yellow'
-        }
+    # Kleurmap voor verschillende buslijnen
+    color_map = {
+        '400.0': 'blue',
+        '401.0': 'yellow'
+    }
 
-        # Zet de buslijnwaarden om naar strings
-        bus_planning['buslijn'] = bus_planning['buslijn'].astype(str)
+    # Zet de buslijnwaarden om naar strings
+    bus_planning['buslijn'] = bus_planning['buslijn'].astype(str)
 
-        # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
-        bus_planning['color'] = bus_planning['buslijn'].map(color_map).fillna('gray')
+    # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
+    bus_planning['color'] = bus_planning['buslijn'].map(color_map).fillna('gray')
 
-        # Maak een figuur voor het plotten
-        fig, ax = plt.subplots(figsize=(12, 6))
+    # Maak een figuur voor het plotten
+    fig, ax = plt.subplots(figsize=(12, 6))
 
-        # Omloopnummers op de Y-as
-        omloopnummers = bus_planning['omloop nummer'].unique()
-        omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
+    # Omloopnummers op de Y-as
+    omloopnummers = bus_planning['omloop nummer'].unique()
+    omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
 
-        # Loop door de unieke omloopnummers
-        for omloop in omloopnummers:
-            trips = bus_planning[bus_planning['omloop nummer'] == omloop]
-        
-            # Controleer of er ritten zijn
-            if trips.empty:
-                # Voeg een zwart blok toe als er geen ritten zijn
-                ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
-                continue
-        
-            # Plot elke trip voor de huidige omloop
-            for _, trip in trips.iterrows():
-                starttime = trip['starttijd']
-                duration = trip['duration']
-                color = trip['color']  # Haal de kleur direct uit de DataFrame
+    # Loop door de unieke omloopnummers
+    for omloop in omloopnummers:
+        trips = bus_planning[bus_planning['omloop nummer'] == omloop]
 
-                # Plot de busrit als een horizontale balk
-                ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
-                        color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else '')
-    
-        # Zet de Y-ticks en labels voor de omloopnummers
-        ax.set_yticks(list(omloop_indices.values()))
-        ax.set_yticklabels(list(omloop_indices.keys()))
+        # Controleer of er ritten zijn
+        if trips.empty:
+            # Voeg een zwart blok toe als er geen ritten zijn
+            ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
+            continue
 
-        # Set axis labels and title
-        ax.set_xlabel('Time (hours)')
-        ax.set_ylabel('Bus Number')
-        ax.set_title('Gantt Chart for Bus Scheduling')
+        # Plot elke trip voor de huidige omloop
+        for _, trip in trips.iterrows():
+            starttime = trip['starttijd']
+            duration = trip['duration']
+            color = trip['color']  # Haal de kleur direct uit de DataFrame
 
-        # Voeg een legenda toe (voorkom dubbele labels)
-        handles, labels = ax.get_legend_handles_labels()
-        unique_labels = dict(zip(labels, handles))
-        ax.legend(unique_labels.values(), unique_labels.keys(), title='Bus Lines')
+            # Plot de busrit als een horizontale balk
+            ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
+                    color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else '')
 
-        plt.show()
+    # Zet de Y-ticks en labels voor de omloopnummers
+    ax.set_yticks(list(omloop_indices.values()))
+    ax.set_yticklabels(list(omloop_indices.keys()))
+
+    # Set axis labels and title
+    ax.set_xlabel('Time (hours)')
+    ax.set_ylabel('Bus Number')
+    ax.set_title('Gantt Chart for Bus Scheduling')
+
+    # Voeg een legenda toe (voorkom dubbele labels)
+    handles, labels = ax.get_legend_handles_labels()
+    unique_labels = dict(zip(labels, handles))
+    ax.legend(unique_labels.values(), unique_labels.keys(), title='Bus Lines')
+
+    # Toon de plot in Streamlit
+    st.pyplot(fig)
 
 # Display the logo
 st.image('tra_logo_rgb_HR.png', width=200)
@@ -356,6 +360,8 @@ def bus_checker_page():
                 distance_matrix = pd.read_excel(given_data, sheet_name='Afstandsmatrix')
                 st.write('Your Bus Planning:')
                 st.dataframe(bus_planning)
+               
+                plot_schedule_from_excel(bus_planning)
 
                 # Valideer de data
                 validation_errors = validate_schedule(bus_planning,time_table,distance_matrix)
@@ -369,6 +375,8 @@ def bus_checker_page():
                     st.success('Your bus planning is valid!')
             except Exception as e:
                 st.error(f'Something went wrong while trying to read the files: {str(e)}')
+
+                
             
             
 
