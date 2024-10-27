@@ -274,74 +274,82 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
-def plot_schedule_from_excel(bus_planning):
-    """Plot een Gantt-grafiek voor busplanning op basis van een DataFrame in Streamlit."""
+def plot_schedule_from_excel(uploaded_file):
+    """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
 
-    # Zorg ervoor dat de juiste datatypes zijn ingesteld
-    bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
-    bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], errors='coerce')
+    uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'])
+    uploaded_file['eindtijd'] = pd.to_datetime(uploaded_file['eindtijd'])
 
-    # Bereken de duur in uren
-    bus_planning['duration'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 3600
+    uploaded_file['duration'] = (uploaded_file['eindtijd'] - uploaded_file['starttijd']).dt.total_seconds() / 3600
 
-    # Kleurmap voor verschillende buslijnen
+    min_duration = 0.05  
+    uploaded_file['duration'] = uploaded_file['duration'].apply(lambda x: max(x, min_duration))
+
     color_map = {
         '400.0': 'blue',
-        '401.0': 'yellow'
+        '401.0': 'yellow',
+        'materiaal rit': 'green',
+        'idle': 'red',
+        'opladen': 'orange'
     }
 
-    # Zet de buslijnwaarden om naar strings
-    bus_planning['buslijn'] = bus_planning['buslijn'].astype(str)
+  
+    uploaded_file['buslijn'] = uploaded_file['buslijn'].astype(str)
 
-    # Voeg een nieuwe kolom toe met de kleur op basis van de buslijn
-    bus_planning['color'] = bus_planning['buslijn'].map(color_map).fillna('gray')
+    def determine_color(row):
+        if pd.notna(row['buslijn']) and row['buslijn'] in color_map:
+            return color_map[row['buslijn']]  
+        elif row['activiteit'] in color_map:
+            return color_map[row['activiteit']]  
+        else:
+            return 'gray' 
 
-    # Maak een figuur voor het plotten
+    uploaded_file['color'] = uploaded_file.apply(determine_color, axis=1)
+
     fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Omloopnummers op de Y-as
-    omloopnummers = bus_planning['omloop nummer'].unique()
+    omloopnummers = uploaded_file['omloop nummer'].unique()
     omloop_indices = {omloop: i for i, omloop in enumerate(omloopnummers)}
 
-    # Loop door de unieke omloopnummers
     for omloop in omloopnummers:
-        trips = bus_planning[bus_planning['omloop nummer'] == omloop]
+        trips = uploaded_file[uploaded_file['omloop nummer'] == omloop]
 
-        # Controleer of er ritten zijn
         if trips.empty:
-            # Voeg een zwart blok toe als er geen ritten zijn
             ax.barh(omloop_indices[omloop], 1, left=0, color='black', edgecolor='black')
             continue
 
-        # Plot elke trip voor de huidige omloop
         for _, trip in trips.iterrows():
             starttime = trip['starttijd']
             duration = trip['duration']
-            color = trip['color']  # Haal de kleur direct uit de DataFrame
+            color = trip['color'] 
 
-            # Plot de busrit als een horizontale balk
             ax.barh(omloop_indices[omloop], duration, left=starttime.hour + starttime.minute / 60,
-                    color=color, edgecolor='black', label=trip['buslijn'] if trip['buslijn'] not in ax.get_legend_handles_labels()[1] else '')
+                    color=color, edgecolor='black')
 
-    # Zet de Y-ticks en labels voor de omloopnummers
     ax.set_yticks(list(omloop_indices.values()))
     ax.set_yticklabels(list(omloop_indices.keys()))
 
-    # Set axis labels and title
+
     ax.set_xlabel('Time (hours)')
-    ax.set_ylabel('Bus Number')
+    ax.set_ylabel('Omloopnummer')
     ax.set_title('Gantt Chart for Bus Scheduling')
 
-    # Voeg een legenda toe (voorkom dubbele labels)
-    handles, labels = ax.get_legend_handles_labels()
-    unique_labels = dict(zip(labels, handles))
-    ax.legend(unique_labels.values(), unique_labels.keys(), title='Bus Lines')
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='blue', edgecolor='black', label='Buslijn 400'),
+        Patch(facecolor='yellow', edgecolor='black', label='Buslijn 401'),
+        Patch(facecolor='green', edgecolor='black', label='dead hend trip'),
+        Patch(facecolor='red', edgecolor='black', label='Idle'),
+        Patch(facecolor='orange', edgecolor='black', label='Opladen')
+    ]
+    
+ 
+    ax.legend(handles=legend_elements, title='Legenda')
 
-    # Toon de plot in Streamlit
-    st.pyplot(fig)
+    plt.show()
 
-# Display the logo
-st.image('tra_logo_rgb_HR.png', width=200)
+
+plot_schedule_from_excel(uploaded_file)
+
 
 # Define Pages
 def bus_checker_page():
