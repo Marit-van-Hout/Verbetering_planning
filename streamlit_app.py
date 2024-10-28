@@ -60,7 +60,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
 
         # Controleer of de batterijstatus onder het minimum komt
         if battery_level < min_batterij:
-            warning_message = f"Warning: Battery under {min_batterij} kWh at bus {row['omloop nummer']} on {row['starttijd']}"
+            warning_message = f"Battery under {min_batterij} kWh for bus {row['omloop nummer']} on {row['starttijd']}"
             st.error(warning_message)
             errors.append(warning_message)
 
