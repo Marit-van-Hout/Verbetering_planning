@@ -42,11 +42,25 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     # charging_time_10 = 60 / 60 # kWh per minute when charging from 90% to 100% (wordt niet gebruikt)
     # daytime_limit = actual_capacity * 0.9 (wordt niet gebruikt)
     
-    import pandas as pd
-    from datetime import datetime
-
     def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, min_batterij=30):
-        df = pd.merge(uploaded_file, distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='left')
+        # Reset indices om ervoor te zorgen dat de dataframes correct worden gestapeld naast elkaar
+        uploaded_file = uploaded_file.reset_index(drop=True)
+        # Normaliseer kolomnamen
+        uploaded_file.columns = uploaded_file.columns.str.strip().str.lower()
+        distance_matrix.columns = distance_matrix.columns.str.strip().str.lower()
+
+        # Controleer of 'afstand in meters' kolom aanwezig is in distance_matrix
+        # **Controle toegevoegd om te bevestigen dat de kolom bestaat**
+        if 'afstand in meters' not in distance_matrix.columns:
+            st.error("Kolom 'afstand in meters' ontbreekt in de distance_matrix.")
+            return
+
+        # Reset de index van de distance_matrix en selecteer de relevante kolommen
+        distance_matrix = distance_matrix[['startlocatie', 'eindlocatie', 'buslijn', 'afstand in meters']].reset_index(drop=True)
+
+        # Merge de DataFrames op relevante kolommen
+        # **Merge in plaats van concat, zodat afstand in meters wordt meegenomen**
+        df = uploaded_file.merge(distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='inner')
 
         # Consumptie voor kilometers
         consumption_per_km = (0.7 + 2.5) / 2  
@@ -100,7 +114,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
             # Bij nieuwe omloop het omloopnummer updaten
             vorig_omloopnummer = row['omloop nummer']
 
-
+        
     # Something went wrong checking route continuity: 'omloop nummer'
     def check_route_continuity(bus_planning): # de bus kan niet vliegen
         """
@@ -174,6 +188,8 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
                 If there are differences, returns a DataFrame with the differences.
                 If all rides are covered, returns a success message.
         """
+        bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
+        time_table['starttijd'] = pd.to_datetime(time_table['starttijd'], errors='coerce')
         time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
     
         bus_planning_sorted = bus_planning.sort_values(by=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']).reset_index(drop=True)
