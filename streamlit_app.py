@@ -110,7 +110,6 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
 
             # Controleer of de batterijstatus onder het minimum komt
             if battery_level < min_batterij:
-                st.error(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
                 errors.append(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
 
             # Bij nieuwe omloop het omloopnummer updaten
@@ -140,8 +139,6 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
             next_start_time = bus_planning.at[i + 1, 'starttijd'].time() # Haal de starttijd van de volgende route op
 
             if current_end_location != next_start_location:
-                st.error(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
-                        f"ends at {current_end_location} and next route starts at {next_start_location}.")
                 errors.append(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
                         f"ends at {current_end_location} and next route starts at {next_start_location}.")
                 return False, errors
@@ -196,13 +193,11 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
             ).query('_merge == "right_only"')
 
         if not difference_bus_planning_to_time_table.empty:
-            st.error('Rows only contained in bus planning:\n', difference_bus_planning_to_time_table)
             errors.append('Rows only contained in bus planning:\n', difference_bus_planning_to_time_table)
             st.dataframe(difference_bus_planning_to_time_table)
             return False, errors
         
         if not difference_time_table_to_bus_planning.empty:
-            st.error('Rows only contained in time table:\n', difference_time_table_to_bus_planning)
             errors.append('Rows only contained in time table:\n', difference_time_table_to_bus_planning)
             st.dataframe(difference_bus_planning_to_time_table)
             return False, errors
@@ -246,7 +241,6 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         # Check if the difference is within the minimum and maximum travel time
         for index, row in merged_df.iterrows():
             if not (row['min reistijd in min'] <= row['verschil_in_minuten'] <= row['max reistijd in min']):
-                st.error(f'Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.')
                 errors.append(f'Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.')
                 return False, errors
             
@@ -260,31 +254,26 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     try: 
         check_batterij_status(bus_planning, distance_matrix, start_batterij=270, min_batterij=30)
     except Exception as e:
-        st.error(f'Something went wrong checking battery: {str(e)}')
         errors.append(f'Something went wrong checking battery: {str(e)}')
     
     try:
         check_route_continuity(bus_planning) 
     except Exception as e:
-        st.error(f'Something went wrong checking route continuity: {str(e)}')
         errors.append(f'Something went wrong checking route continuity: {str(e)}')
     
     try:
         driven_rides(bus_planning)
     except Exception as e:
-        st.error(f'Something went wrong checking driven rides: {str(e)}')
         errors.append(f'Something went wrong checking driven rides: {str(e)}')
     
     try:
         every_ride_covered(bus_planning, time_table)
     except Exception as e:
-        st.error(f'Something went wrong checking if each ride is covered: {str(e)}')
         errors.append(f'Something went wrong checking if each ride is covered: {str(e)}')
     
     try:
         check_travel_time(bus_planning, distance_matrix)
     except Exception as e:
-        st.error(f'Something went wrong checking the travel time: {str(e)}')
         errors.append(f'Something went wrong checking the travel time: {str(e)}')
     
     return errors
