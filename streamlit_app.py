@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from datetime import datetime
+from matplotlib.patches import Patch
 
 # Load data
 #uploaded_file = pd.read_excel('omloopplanning.xlsx')
@@ -196,6 +197,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
             return 'Bus planning is equal to time table'
     
+  
     def check_travel_time(bus_planning, distance_matrix):
         """
         Check if the time difference between the start time and end time in bus planning
@@ -258,25 +260,11 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         st.error(f'Something went wrong checking if each ride is covered: {str(e)}')
     
     try:
-        plot_schedule_from_excel(bus_planning)
-    except Exception as e:
-        st.error(f'Something went wrong plotting the bus planning: {str(e)}')
-    
-    try:
         check_travel_time(bus_planning, distance_matrix)
     except Exception as e:
         st.error(f'Something went wrong checking the travel time: {str(e)}')
     
-    try:
-        plot_schedule_from_excel(bus_planning)
-    except Exception as e:
-        st.error(f'there is something wrong with plotting the schedule: {str(e)}')
     return error
-    
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import streamlit as st
 
 def plot_schedule_from_excel(uploaded_file):
     """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
@@ -334,22 +322,21 @@ def plot_schedule_from_excel(uploaded_file):
 
 
     ax.set_xlabel('Time (hours)')
-    ax.set_ylabel('Omloopnummer')
+    ax.set_ylabel('Bus Number')
     ax.set_title('Gantt Chart for Bus Scheduling')
 
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor='blue', edgecolor='black', label='Buslijn 400'),
-        Patch(facecolor='yellow', edgecolor='black', label='Buslijn 401'),
-        Patch(facecolor='green', edgecolor='black', label='dead hend trip'),
+        Patch(facecolor='blue', edgecolor='black', label='Regular trip 400'),
+        Patch(facecolor='yellow', edgecolor='black', label='Regular trip 401'),
+        Patch(facecolor='green', edgecolor='black', label='Deadhead trip'),
         Patch(facecolor='red', edgecolor='black', label='Idle'),
-        Patch(facecolor='orange', edgecolor='black', label='Opladen')
+        Patch(facecolor='orange', edgecolor='black', label='Charging')
     ]
-    
  
     ax.legend(handles=legend_elements, title='Legenda')
 
-    plt.show()
+    st.pyplot(fig)
 
 
 # Define Pages
