@@ -124,22 +124,21 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         Output: Print messages if there are inconsistencies.
         """
     
-        # Check of de kolom 'omloop nummer' en andere benodigde kolommen bestaan
-        required_columns = ['eindlocatie','omloop nummer', 'startlocatie']
-        missing_columns = [col for col in required_columns if col not in bus_planning.columns]#Is ervoor om het probleem sneller te vinden en aan te pakken
-        if missing_columns:
-            st.error(f"Missing columns in bus planning: {', '.join(missing_columns)}")
-            return False
+        # Check for NaN-values in 'omloop nummer'
         if bus_planning['omloop nummer'].isna().any():
             st.error("NaN values found in 'omloop nummer' column.")
             return False
+        
+        # Check the continuity of the busses
         for i in range(len(bus_planning) - 1): 
             current_end_location = bus_planning.at[i, 'eindlocatie']
             next_start_location = bus_planning.at[i + 1, 'startlocatie']
             omloop_nummer = bus_planning.at[i, 'omloop nummer']
+            next_start_time = bus_planning.at[i + 1, 'starttijd'].time() # Get start time for the next ride
 
             if current_end_location != next_start_location:
-                st.error(f'Route continuity issue between omloop nummer {omloop_nummer:.0f}: ends at {current_end_location} and next route starts at {next_start_location}.')
+                st.error(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
+                     f"ends at {current_end_location} and next route starts at {next_start_location}.")
                 return False
             return True
 
@@ -157,7 +156,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
 
 
     def driven_rides(bus_planning):
-        """ displays which rides are droven
+        """ displays which rides are driven
         Parameters
             omloopplanning: DataFrame
             The full circulation planning data.
