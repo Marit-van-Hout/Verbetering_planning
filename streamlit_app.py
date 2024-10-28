@@ -30,7 +30,7 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     - Een lijst van foutmeldingen die zijn opgetreden tijdens de validatie.
     """
 
-    error = []
+    errors = []
 
     # Parameters
     max_capacity = 300 # maximum capacity in kWh
@@ -53,7 +53,8 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         # **Controle toegevoegd om te bevestigen dat de kolom bestaat**
         if 'afstand in meters' not in distance_matrix.columns:
             st.error("Kolom 'afstand in meters' ontbreekt in de distance_matrix.")
-            return
+            errors.append("Kolom 'afstand in meters' ontbreekt in de distance_matrix.")
+            return errors
 
         # Reset de index van de distance_matrix en selecteer de relevante kolommen
         distance_matrix = distance_matrix[['startlocatie', 'eindlocatie', 'buslijn', 'afstand in meters']].reset_index(drop=True)
@@ -110,50 +111,42 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
             # Controleer of de batterijstatus onder het minimum komt
             if battery_level < min_batterij:
                 st.error(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
+                errors.append(f"Waarschuwing: Batterij onder {min_batterij} kWh bij omloop {row['omloop nummer']} op tijd {row['starttijd']}")
 
             # Bij nieuwe omloop het omloopnummer updaten
             vorig_omloopnummer = row['omloop nummer']
-
         
+        return errors
+
     # Something went wrong checking route continuity: 'omloop nummer'
-    def check_route_continuity(bus_planning): # de bus kan niet vliegen
-        """
-        Check if the endpoint of route n matches the start point of route n+1.
+    def check_route_continuity(bus_planning):
+        """ Check if the endpoint of route n matches the start point of route n+1.
         Parameters:
-        - bus_planning: DataFrame with route data.
+            - bus_planning: DataFrame with route data.
         Output: Print messages if there are inconsistencies.
         """
     
-        # Check for NaN-values in 'omloop nummer'
+      # Controleer op NaN-waarden in 'omloop nummer'
         if bus_planning['omloop nummer'].isna().any():
             st.error("NaN values found in 'omloop nummer' column.")
-            return False
-        
-        # Check the continuity of the busses
-        for i in range(len(bus_planning) - 1): 
+            errors.append("NaN values found in 'omloop nummer' column.")
+            return False, errors
+
+        # Controleer de continuïteit van de routes
+        for i in range(len(bus_planning) - 1):
             current_end_location = bus_planning.at[i, 'eindlocatie']
             next_start_location = bus_planning.at[i + 1, 'startlocatie']
             omloop_nummer = bus_planning.at[i, 'omloop nummer']
-            next_start_time = bus_planning.at[i + 1, 'starttijd'].time() # Get start time for the next ride
+            next_start_time = bus_planning.at[i + 1, 'starttijd'].time() # Haal de starttijd van de volgende route op
 
             if current_end_location != next_start_location:
                 st.error(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
-                     f"ends at {current_end_location} and next route starts at {next_start_location}.")
-                return False
-            return True
-
-        # Controleer de continuïteit van de routes
-        for i in range(len(bus_planning) - 1): 
-            current_end_location = bus_planning.at[i, 'eindlocatie']
-            next_start_location = bus_planning.at[i + 1, 'startlocatie']
-            omloop_nummer = bus_planning.at[i, 'omloop nummer']
-
-            if current_end_location != next_start_location:
-                st.error(f'Route continuity issue between omloop nummer {omloop_nummer:.0f}, ending at {current_end_location} and next route starting at {next_start_location}.')
-                return False
-       
-        return True
-
+                        f"ends at {current_end_location} and next route starts at {next_start_location}.")
+                errors.append(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
+                        f"ends at {current_end_location} and next route starts at {next_start_location}.")
+                return False, errors
+         
+        return True, errors
 
     def driven_rides(bus_planning):
         """ displays which rides are driven
@@ -204,13 +197,20 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
 
         if not difference_bus_planning_to_time_table.empty:
             st.error('Rows only contained in bus planning:\n', difference_bus_planning_to_time_table)
+            errors.append('Rows only contained in bus planning:\n', difference_bus_planning_to_time_table)
             st.dataframe(difference_bus_planning_to_time_table)
+            return False, errors
+        
         if not difference_time_table_to_bus_planning.empty:
             st.error('Rows only contained in time table:\n', difference_time_table_to_bus_planning)
+            errors.append('Rows only contained in time table:\n', difference_time_table_to_bus_planning)
             st.dataframe(difference_bus_planning_to_time_table)
-
+            return False, errors
+        
         if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
             return 'Bus planning is equal to time table'
+        
+        return True, errors
     
   
     def check_travel_time(bus_planning, distance_matrix):
@@ -247,7 +247,10 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         for index, row in merged_df.iterrows():
             if not (row['min reistijd in min'] <= row['verschil_in_minuten'] <= row['max reistijd in min']):
                 st.error(f'Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.')
-
+                errors.append(f'Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) is not between {row['max reistijd in min']} and {row['min reistijd in min']} for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.')
+                return False, errors
+            
+        return True, errors
     # De validatiefuncties aanroepen
     #try:
         #time_table['end_time'] = time_table.apply(calculate_end_time, axis=1)
@@ -258,28 +261,33 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
         check_batterij_status(bus_planning, distance_matrix, start_batterij=270, min_batterij=30)
     except Exception as e:
         st.error(f'Something went wrong checking battery: {str(e)}')
+        errors.append(f'Something went wrong checking battery: {str(e)}')
     
     try:
         check_route_continuity(bus_planning) 
     except Exception as e:
         st.error(f'Something went wrong checking route continuity: {str(e)}')
+        errors.append(f'Something went wrong checking route continuity: {str(e)}')
     
     try:
         driven_rides(bus_planning)
     except Exception as e:
         st.error(f'Something went wrong checking driven rides: {str(e)}')
+        errors.append(f'Something went wrong checking driven rides: {str(e)}')
     
     try:
         every_ride_covered(bus_planning, time_table)
     except Exception as e:
         st.error(f'Something went wrong checking if each ride is covered: {str(e)}')
+        errors.append(f'Something went wrong checking if each ride is covered: {str(e)}')
     
     try:
         check_travel_time(bus_planning, distance_matrix)
     except Exception as e:
         st.error(f'Something went wrong checking the travel time: {str(e)}')
+        errors.append(f'Something went wrong checking the travel time: {str(e)}')
     
-    return error
+    return errors
 
 def plot_schedule_from_excel(uploaded_file):
     """Plot een Gantt-grafiek voor busplanning op basis van een Excel-bestand."""
