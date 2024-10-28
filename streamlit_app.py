@@ -267,6 +267,10 @@ def validate_schedule(bus_planning, time_table, distance_matrix):
     except Exception as e:
         st.error(f'Something went wrong checking the travel time: {str(e)}')
     
+    try:
+        plot_schedule_from_excel(bus_planning)
+    except Exception as e:
+        st.error(f'there is something wrong with plotting the schedule: {str(e)}')
     return error
     
 
@@ -346,9 +350,6 @@ def plot_schedule_from_excel(uploaded_file):
     ax.legend(handles=legend_elements, title='Legenda')
 
     plt.show()
-
-
-plot_schedule_from_excel(uploaded_file)
 
 
 # Define Pages
