@@ -62,7 +62,6 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
         if battery_level < min_batterij:
             warning_message = f"Battery under {min_batterij} kWh for bus {row['omloop nummer']} on {row['starttijd']}"
             st.error(warning_message)
-            errors.append(warning_message)
 
         # Bij nieuwe omloop het omloopnummer updaten
         vorig_omloopnummer = row['omloop nummer']
@@ -334,9 +333,9 @@ def bus_checker_page():
                 errors.append(f'Something went wrong checking the travel time: {str(e)}')
 
             if errors:
-                st.write("Errors gevonden:")
-                for error in errors:
-                    st.write(error)
+                st.write("Errors found")
+                #for error in errors:
+                    #st.write(error)
             else:
                 st.success("Schedule is valid!")
 
