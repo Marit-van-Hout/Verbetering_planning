@@ -142,14 +142,14 @@ def every_ride_covered(bus_planning, time_table):
         return False, errors
 
     if not difference_time_table_to_bus_planning.empty:
-        errors.append("Rows only contained in time table:")
+        errors.append("Rows only contained in timetable:")
         errors.append(difference_time_table_to_bus_planning.to_string())
        # st.dataframe(difference_time_table_to_bus_planning)  # Show the differences in Streamlit
         return False, errors
 
     # If no differences are found, return success
     if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
-        return "Bus planning is equal to time table", errors
+        return "Bus planning is equal to timetable", errors
 
     return True, errors
 
@@ -329,6 +329,6 @@ def main(uploaded_file, given_data):
 # Streamlit 
 st.title("Bus Planning Checker")
 uploaded_file = st.file_uploader("Upload Your Bus Planning Here", type="xlsx")
-given_data = st.file_uploader("Upload Your Time Table Here", type="xlsx")
+given_data = st.file_uploader("Upload Your Timetable Here", type="xlsx")
 
 main(uploaded_file, given_data)
