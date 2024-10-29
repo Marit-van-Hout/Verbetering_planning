@@ -273,7 +273,7 @@ def plot_schedule_from_excel(bus_planning):
         Patch(facecolor='orange', edgecolor='black', label='Charging')
     ]
  
-    ax.legend(handles=legend_elements, title='Legenda')
+    ax.legend(handles=legend_elements, title='Legend')
 
     st.pyplot(fig)
 
