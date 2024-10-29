@@ -27,9 +27,11 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
     # Beginwaarden
     battery_level = start_batterij
     vorig_omloopnummer = df['omloop nummer'].iloc[0]
-
+    # Ensure 'starttijd' column is datetime format, then extract only time for continuity check
+    uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'], format='%H:%M').dt.time
     # Itereren door de DataFrame
     for i, row in df.iterrows():
+        next_start_time = uploaded_file.at[i + 1, 'starttijd'] # Haal de starttijd van de volgende route op
         # Controleer of het een nieuwe omloop is
         if row['omloop nummer'] != vorig_omloopnummer:
             # Energieverbruik afhalen vóór het resetten van de batterij
@@ -60,7 +62,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
 
         # Controleer of de batterijstatus onder het minimum komt
         if battery_level < min_batterij:
-            warning_message = f"Battery under {min_batterij} kWh for bus {row['omloop nummer']} on {row['starttijd']}"
+            warning_message = f"Battery under {min_batterij} kWh for bus {row['omloop nummer']} at {next_start_time}"
             st.error(warning_message)
 
         # Bij nieuwe omloop het omloopnummer updaten
@@ -90,6 +92,7 @@ def check_route_continuity(bus_planning):
         if bus_planning[['omloop nummer', 'startlocatie', 'eindlocatie', 'starttijd']].isnull().any().any():
             st.error("NaN values found in critical columns of 'bus_planning'.")
             return errors
+        
     # Controleer de continuïteit van de routes
         for i in range(len(bus_planning) - 1):
             current_end_location = bus_planning.at[i, 'eindlocatie']
@@ -98,7 +101,7 @@ def check_route_continuity(bus_planning):
             next_start_time = bus_planning.at[i + 1, 'starttijd'] # Haal de starttijd van de volgende route op
 
             if current_end_location != next_start_location:
-                st.error(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
+                st.error(f"Route continuity issue for bus {omloop_nummer:.0f} at {next_start_time}: "
                         f"ends at {current_end_location} and next route starts at {next_start_location}.")
         return errors
 
@@ -135,13 +138,13 @@ def every_ride_covered(bus_planning, time_table):
     if not difference_bus_planning_to_time_table.empty:
         errors.append("Rows only contained in bus planning:")
         errors.append(difference_bus_planning_to_time_table.to_string())
-        st.dataframe(difference_bus_planning_to_time_table)  # Show the differences in Streamlit
+       # st.dataframe(difference_bus_planning_to_time_table)  # Show the differences in Streamlit
         return False, errors
 
     if not difference_time_table_to_bus_planning.empty:
         errors.append("Rows only contained in time table:")
         errors.append(difference_time_table_to_bus_planning.to_string())
-        st.dataframe(difference_time_table_to_bus_planning)  # Show the differences in Streamlit
+       # st.dataframe(difference_time_table_to_bus_planning)  # Show the differences in Streamlit
         return False, errors
 
     # If no differences are found, return success
@@ -281,11 +284,11 @@ st.sidebar.title('Navigation')
 def bus_checker_page(): 
     st.title("Bus Planning Checker")
 
-    uploaded_file = st.file_uploader("Upload omloopplanning.xlsx", type="xlsx")
-    given_data = st.file_uploader("Upload Connexxion data - 2024-2025.xlsx", type="xlsx")
+    uploaded_file = st.file_uploader("Upload Your Bus Planning Here", type="xlsx")
+    given_data = st.file_uploader("Upload Your Time Table Here", type="xlsx")
 
     if uploaded_file and given_data:
-        with st.spinner('Data is being processed'): 
+        with st.spinner('Your data is being processed...'): 
             try:
                 bus_planning = pd.read_excel(uploaded_file)
                 time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
@@ -297,10 +300,10 @@ def bus_checker_page():
             st.write('Your Bus Planning:')
             st.dataframe(bus_planning)
 
-            st.write('Gantt Chart Bus Planning')
+            st.write('Gantt Chart Of Your Bus Planning:')
             plot_schedule_from_excel(bus_planning)  # Hier gebruiken we bus_planning in plaats van uploaded_file
 
-            st.write('Errors in Planning')
+            st.write('There Were Errors Found In Your Bus Planning:')
             errors = []
 
             if bus_planning.empty or time_table.empty or distance_matrix.empty:
@@ -331,13 +334,6 @@ def bus_checker_page():
                 errors += check_travel_time(bus_planning, distance_matrix)
             except Exception as e:
                 errors.append(f'Something went wrong checking the travel time: {str(e)}')
-
-            if errors:
-                st.write("Errors found")
-                #for error in errors:
-                    #st.write(error)
-            else:
-                st.success("Schedule is valid!")
 
 
 def how_it_works_page():
