@@ -41,8 +41,8 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
         # Opladen
         if row['activiteit'] == 'opladen':
             # Start- en eindtijd ophalen en de duur berekenen
-            start_time = datetime.strptime(row['starttijd'], '%H:%M:%S')
-            end_time = datetime.strptime(row['eindtijd'], '%H:%M:%S')
+            start_time = row['starttijd']
+            end_time = row['eindtijd']
             charging_duration = (end_time - start_time).total_seconds() / 60
 
             # Bepaal de laadsnelheid
@@ -76,21 +76,32 @@ def check_route_continuity(bus_planning):
         Output: Print messages if there are inconsistencies.
         """
     
+        errors = []
         #Controleer op NaN-waarden in 'omloop nummer'
-        if bus_planning['omloop nummer'].isna().any():
+        if bus_planning is None:
             st.error("NaN values found in 'omloop nummer' column.")
-            return False
+            return errors
+        required_columns = {'omloop nummer', 'startlocatie', 'eindlocatie', 'starttijd'}
+        if not required_columns.issubset(bus_planning.columns):
+            missing_columns = required_columns - set(bus_planning.columns)
+            st.error(f"Missing columns in 'bus_planning': {missing_columns}")
+            return errors
 
+    # Check for NaN values in critical columns
+        if bus_planning[['omloop nummer', 'startlocatie', 'eindlocatie', 'starttijd']].isnull().any().any():
+            st.error("NaN values found in critical columns of 'bus_planning'.")
+            return errors
     # Controleer de continuïteit van de routes
         for i in range(len(bus_planning) - 1):
             current_end_location = bus_planning.at[i, 'eindlocatie']
             next_start_location = bus_planning.at[i + 1, 'startlocatie']
             omloop_nummer = bus_planning.at[i, 'omloop nummer']
-            next_start_time = bus_planning.at[i + 1, 'starttijd'].time() # Haal de starttijd van de volgende route op
+            next_start_time = bus_planning.at[i + 1, 'starttijd'] # Haal de starttijd van de volgende route op
 
             if current_end_location != next_start_location:
                 st.error(f"Route continuity issue between bus number {omloop_nummer:.0f} at {next_start_time}: "
                         f"ends at {current_end_location} and next route starts at {next_start_location}.")
+        return errors
 
 def driven_rides(bus_planning):
     clean_bus_planning = bus_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
@@ -99,6 +110,14 @@ def driven_rides(bus_planning):
 
 def every_ride_covered(bus_planning, time_table):
     errors = []
+        # Ensure columns are correctly named
+    if 'vertrektijd' in time_table.columns:
+        time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
+    
+    # Check if 'starttijd' exists in both DataFrames
+    if 'starttijd' not in bus_planning.columns or 'starttijd' not in time_table.columns:
+        errors.append("Missing 'starttijd' column in either 'bus_planning' or 'time_table'.")
+        return False, errors
     bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
     time_table['starttijd'] = pd.to_datetime(time_table['starttijd'], errors='coerce')
     time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
@@ -115,41 +134,67 @@ def every_ride_covered(bus_planning, time_table):
     ).query('_merge == "right_only"')
 
     if not difference_bus_planning_to_time_table.empty:
-        errors.append('Rows only contained in bus planning:\n', difference_bus_planning_to_time_table)
-        st.dataframe(difference_bus_planning_to_time_table)
+        errors.append("Rows only contained in bus planning:")
+        errors.append(difference_bus_planning_to_time_table.to_string())
+        st.dataframe(difference_bus_planning_to_time_table)  # Show the differences in Streamlit
         return False, errors
-        
+
     if not difference_time_table_to_bus_planning.empty:
-        errors.append('Rows only contained in time table:\n', difference_time_table_to_bus_planning)
-        st.dataframe(difference_time_table_to_bus_planning)
+        errors.append("Rows only contained in time table:")
+        errors.append(difference_time_table_to_bus_planning.to_string())
+        st.dataframe(difference_time_table_to_bus_planning)  # Show the differences in Streamlit
         return False, errors
-        
+
+    # If no differences are found, return success
     if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
-        return 'Bus planning is equal to time table'
-    
+        return "Bus planning is equal to time table", errors
+
     return True, errors
 
 def check_travel_time(bus_planning, distance_matrix):
     errors = []
+    
+    # Check if 'starttijd' and 'eindtijd' columns exist
+    if 'starttijd' not in bus_planning.columns or 'eindtijd' not in bus_planning.columns:
+        errors.append("Missing 'starttijd' or 'eindtijd' column in bus planning data.")
+        return False, errors
+    
+    # Convert 'starttijd' and 'eindtijd' to datetime, handling errors
     bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], format='%H:%M:%S', errors='coerce')
     bus_planning['eindtijd'] = pd.to_datetime(bus_planning['eindtijd'], format='%H:%M:%S', errors='coerce')
+    
+    # Check if there are any NaT (null) values after conversion
+    if bus_planning['starttijd'].isna().any() or bus_planning['eindtijd'].isna().any():
+        errors.append("Found invalid 'starttijd' or 'eindtijd' entries that could not be converted to time.")
+        st.error(errors[-1])
+        return False, errors
 
+    # Calculate difference in minutes
     bus_planning['verschil_in_minuten'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 60
-
+    
+    # Merge with distance_matrix
     merged_df = pd.merge(
         bus_planning,
         distance_matrix,
         on=['startlocatie', 'eindlocatie', 'buslijn'],
-        how='inner'  
+        how='inner'
     )
 
+    # Check if travel time falls within the expected range
     for index, row in merged_df.iterrows():
         if not (row['min reistijd in min'] <= row['verschil_in_minuten'] <= row['max reistijd in min']):
-            errors.append(f'Row {index}: The difference in minutes ({row["verschil_in_minuten"]:.0f}) is not between {row["max reistijd in min"]} and {row["min reistijd in min"]} for bus route {row["buslijn"]} from {row["startlocatie"]} to {row["eindlocatie"]}.')
-            st.error(errors[-1])
-            return False, errors
-            
-    return True, errors
+            error_message = (f"Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) "
+                             f"is not between {row['max reistijd in min']} and {row['min reistijd in min']} "
+                             f"for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
+            errors.append(error_message)
+            st.error(error_message)  # Display error in Streamlit
+
+    # Return results based on whether errors were found
+    if errors:
+        return False, errors
+    else:
+        return True, errors
+
 
 def plot_schedule_from_excel(bus_planning):
     """Plot een Gantt-grafiek voor busplanning op basis van een DataFrame."""
