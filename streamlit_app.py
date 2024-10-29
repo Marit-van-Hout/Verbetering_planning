@@ -303,7 +303,7 @@ def bus_checker_page():
             st.write('Gantt Chart Of Your Bus Planning:')
             plot_schedule_from_excel(bus_planning)  # Hier gebruiken we bus_planning in plaats van uploaded_file
 
-            st.write('There Were Errors Found In Your Bus Planning:')
+            st.write('There Were Mistakes Found In Your Bus Planning:')
             errors = []
 
             if bus_planning.empty or time_table.empty or distance_matrix.empty:
