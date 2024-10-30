@@ -7,7 +7,6 @@ st.write("**The app checks the following conditions:**")
 st.markdown("""
 1. **Battery Status**: the app checks and ensures that the battery level of the bus does not drop below **10%** of the State of Health, which is **30 kWh**. 
 The system accounts for both driving and idle time consumption and models charging times at two rates: a higher rate for charging up to **90%** and a slower rate beyond that. 
-If the battery level dips below this threshold during the journey, the system alerts the user with details on the specific route and time when the drop occurred.
 
 2. **Route Continuity**: the app checks that the endpoint of each route aligns with the starting location of the following route to maintain continuity in the bus's journey. 
 
