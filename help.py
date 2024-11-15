@@ -25,7 +25,7 @@ with tab1:
         - The uploaded bus planning for easy viewing and verification
         - A visualization of the planning to help you identify issues at a glance.
         - A list of detected issues or inconsistencies in your planning""")
-    st.image('Picture4.png', width=400)
+    st.image('Picture3.png', width=400)
 
 with tab2:
     st.subheader("**Troubleshooting**")
