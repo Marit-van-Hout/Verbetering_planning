@@ -22,69 +22,63 @@ with st.sidebar:
         page = 'Help'
     
     st.subheader('Parameters')
-    consumption_per_km = st.slider("**Battery Consumption Per KM**", 0.7, 2.5, 1.6)
-    SOH = st.slider("**State Of Health**", 0.85, 0.95, 0.90)
-
-
-def check_batterij_status(uploaded_file, distance_matrix, SOH, min_batterij=30):
+    SOH =                   st.slider("**State Of Health** %", 85, 95, 90)
+    min_SOC =               st.slider("**Minimum State Of Charge** %", 5, 25, 10)
+    consumption_per_km =    st.slider("**Battery Consumption Per KM** KwH", 0.7, 2.5, 1.6)
     
-    max_capacity = 300 * SOH
-    
-    # Gegevens inladen en DataFrame samenvoegen
+def check_batterij_status(uploaded_file, distance_matrix, SOH, min_SOC, consumption_per_km):
+    max_capacity = 300 * (SOH / 100)
+    min_batterij = max_capacity * (min_SOC / 100)
+
+    # Verwerk tijd
+    uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'], format='%H:%M')
+    uploaded_file['eindtijd'] = pd.to_datetime(uploaded_file['eindtijd'], format='%H:%M')
+
+    # DataFrame samenvoegen
     df = pd.merge(uploaded_file, distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='left')
 
-    # Consumptie voor kilometers 
-    df['consumptie_kWh'] = (df['afstand in meters'] / 1000) * consumption_per_km
+    # Energieverbruik berekenen met minimumwaarde
+    df['consumptie_kWh'] = (df['afstand in meters'] / 1000) * max(consumption_per_km, 0.7)
 
-    # Consumptie voor idle activiteiten
+    # Idle verbruik
     df.loc[df['activiteit'] == 'idle', 'consumptie_kWh'] = 0.01
 
-    # Laadsnelheden instellen
-    charging_speed_90 = 450 / 60  # kWh per minuut voor opladen tot 90%
-    charging_speed_10 = 60 / 60   # kWh per minuut voor opladen van 90% tot 100%
+    # Laadsnelheden
+    charging_speed_90 = 450 / 60
+    charging_speed_10 = 60 / 60
 
-    # Beginwaarden
     battery_level = max_capacity
     vorig_omloopnummer = df['omloop nummer'].iloc[0]
-    # Ensure 'starttijd' column is datetime format, then extract only time for continuity check
-    uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'], format='%H:%M').dt.time
-    # Itereren door de DataFrame
+
     for i, row in df.iterrows():
-        next_start_time = uploaded_file.at[i + 1, 'starttijd'] # Haal de starttijd van de volgende route op
-        # Controleer of het een nieuwe omloop is
+        next_start_time = uploaded_file.at[i + 1, 'starttijd'] if i + 1 < len(uploaded_file) else None
+
+        # Nieuwe omloop controle
         if row['omloop nummer'] != vorig_omloopnummer:
-            # Energieverbruik afhalen vóór het resetten van de batterij
             battery_level -= row['consumptie_kWh']
-            
-            # Reset de batterij naar start_batterij
+            battery_level = max(battery_level, 0)
             battery_level = max_capacity
 
         # Opladen
         if row['activiteit'] == 'opladen':
-            # Start- en eindtijd ophalen en de duur berekenen
             start_time = row['starttijd']
             end_time = row['eindtijd']
             charging_duration = (end_time - start_time).total_seconds() / 60
 
-            # Bepaal de laadsnelheid
             if battery_level <= 243:
                 charge_power = charging_speed_90 * charging_duration
             else:
                 charge_power = charging_speed_10 * charging_duration
 
-            # Opladen en aanpassen van de batterijstatus
-            battery_level += charge_power
-
+            battery_level = min(battery_level + charge_power, max_capacity)
         else:
-            # Verminderen met de consumptie
             battery_level -= row['consumptie_kWh']
+            battery_level = max(battery_level, 0)  # Zorg dat batterij niet negatief wordt
 
-        # Controleer of de batterijstatus onder het minimum komt
         if battery_level < min_batterij:
-            warning_message = f"Battery under {min_batterij} kWh for bus {row['omloop nummer']} at {next_start_time}"
+            warning_message = f"Battery under {min_batterij:.2f} kWh for bus {row['omloop nummer']} at {next_start_time}"
             st.error(warning_message)
 
-        # Bij nieuwe omloop het omloopnummer updaten
         vorig_omloopnummer = row['omloop nummer']
     
 
@@ -308,7 +302,7 @@ def bus_checker_page():
                 return
 
             try: 
-                check_batterij_status(bus_planning, distance_matrix, SOH)
+                check_batterij_status(bus_planning, distance_matrix, SOH, min_SOC, consumption_per_km)
             except Exception as e:
                 st.errors(f'Something went wrong checking battery: {str(e)}')
 
