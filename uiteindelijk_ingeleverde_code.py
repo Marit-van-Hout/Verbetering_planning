@@ -15,11 +15,6 @@ with st.sidebar:
         page = 'How It Works'
     if st.button('Help', icon="❓", use_container_width=True):
         page = 'Help'
-    
-    st.subheader('Parameters')
-    SOH =                   st.slider("**State Of Health** %", 85, 95, 90)
-    min_SOC =               st.slider("**Minimum State Of Charge** %", 5, 25, 10)
-    consumption_per_km =    st.slider("**Battery Consumption Per KM** KwH", 0.7, 2.5, 1.6)
    
    
 # OMLOOPPLANNING VALIDEREN
@@ -329,33 +324,61 @@ def plot_schedule_from_excel(bus_planning):
     st.pyplot(fig)
 
 
+# KPI's BEREKENEN
+# Total busses used
+# Total hours spend on deadhead trip
+# Total energy consumed
+# st.metric(label="Gas price", value=4, delta=-0.5, delta_color="inverse")
+
+
 # PAGINA'S DEFINIEREN
 def bus_checker_page(): 
-    st.title("Bus Planning Checker")
+    st.header("Bus Planning Checker")
 
-    uploaded_file = st.file_uploader("Upload Your Bus Planning Here", type="xlsx")
-    given_data = st.file_uploader("Upload Your Time Table Here", type="xlsx")
- 
-    if uploaded_file and given_data:
-        with st.spinner('Your data is being processed...'): 
-            try:
-                bus_planning = pd.read_excel(uploaded_file)
-                time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
-                distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
-            except Exception as e:
-                st.error(f"Error reading Excel files: {str(e)}")
-                return
+    tab1, tab2, tab3, tab4 = st.tabs(['Data and Parameters', 'Your Data', 'Validity Checks', 'KPIs'])
+    
+    with tab1:
+        # File uploaders
+        st.subheader('Data')
+        col1, col2 = st.columns(2)
+    
+        with col1:
+            uploaded_file = st.file_uploader("Upload Your Bus Planning Here", type="xlsx")
+        with col2:
+            given_data = st.file_uploader("Upload Your Time Table Here", type="xlsx")
+        
+        st.subheader('Parameters')
+        SOH =                   st.slider("**State Of Health** %", 85, 95, 90)
+        min_SOC =               st.slider("**Minimum State Of Charge** %", 5, 25, 10)
+        consumption_per_km =    st.slider("**Battery Consumption Per KM** KwH", 0.7, 2.5, 1.6)
 
-            st.write('Your Bus Planning:')
-            st.dataframe(bus_planning)
+    with tab2:
+        # Check if the required files are uploaded
+        if not uploaded_file or not given_data:
+            st.error("You need to upload your data in the 'Data and Parameters' tab.")
+            return  # Stop execution if files are not uploaded
+        
+        if uploaded_file and given_data:
+            with st.spinner('Your data is being processed...'): 
+                try:
+                    bus_planning = pd.read_excel(uploaded_file)
+                    time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
+                    distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
+                except Exception as e:
+                    st.error(f"Error reading Excel files: {str(e)}")
+                    return
 
-            st.write('Gantt Chart Of Your Bus Planning:')
-            plot_schedule_from_excel(bus_planning)  
+                st.write('Your Bus Planning:')
+                st.dataframe(bus_planning, hide_index=True)
+
+                st.write('Gantt Chart Of Your Bus Planning:')
+                plot_schedule_from_excel(bus_planning)  
             
-            if bus_planning.empty or time_table.empty or distance_matrix.empty:
-                st.error("One or more DataFrames are empty. Please check the uploaded files.")
-                return
+                if bus_planning.empty or time_table.empty or distance_matrix.empty:
+                    st.error("One or more DataFrames are empty. Please check the uploaded files.")
+                    return
 
+    with tab3:
             # Check Batterij Status
             st.subheader('Battery Status')
             try: 
@@ -363,8 +386,9 @@ def bus_checker_page():
                 if battery_problems.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Battery dips under minimum State Of Charge in the following rows:')
-                    st.dataframe(battery_problems)       
+                    st.write('Battery dips under minimum State Of Charge')
+                    with st.expander('Click to see the affected rows'):
+                        st.dataframe(battery_problems)       
             except Exception as e:
                 st.error(f'Something went wrong checking battery: {str(e)}')
             
@@ -375,8 +399,9 @@ def bus_checker_page():
                 if continuity_problems.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Start and en location do not line up in the following rows:')
-                    st.dataframe(continuity_problems)
+                    st.write('Start and en location do not line up')
+                    with st.expander('Click to see the affected rows'):
+                        st.dataframe(continuity_problems)
             except Exception as e:
                 st.error(f'Something went wrong checking route continuity: {str(e)}')
 
@@ -393,8 +418,9 @@ def bus_checker_page():
                 if ride_coverage.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Ride coverage issues found in the following rows:')
-                    st.dataframe(ride_coverage)             
+                    st.write('Ride coverage issues found')
+                    with st.expander('Click to see the affected rows'):
+                        st.dataframe(ride_coverage)             
             except Exception as e:
                 st.error(f'Something went wrong checking if each ride is covered: {str(e)}')
 
@@ -405,14 +431,16 @@ def bus_checker_page():
                 if travel_time.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Issues with travel time found in the following rows:')
-                    st.dataframe(travel_time)  
+                    st.write('Issues with travel time found')
+                    with st.expander('Click to see the affected rows'):
+                        st.dataframe(travel_time)  
             except Exception as e:
                 st.error(f'Something went wrong checking the travel time: {str(e)}')
-                
+    with tab4:
+        st.write('check KPI')
                 
 def how_it_works_page():
-    st.title("How It Works")
+    st.header("How It Works")
 
     st.write("**The app checks the following conditions:**")
 
@@ -434,9 +462,9 @@ def how_it_works_page():
     
 
 def help_page():
-    st.title("Help")
+    st.header("Help")
 
-    tab1, tab2, tab3 = st.tabs(['How to use', 'Troubleshooting', 'Error interpretation'])
+    tab1, tab2, tab3 = st.tabs(['How To Use', 'Troubleshooting', 'Error Interpretation'])
 
     with tab1:
         st.subheader("**Need assistance?**")
