@@ -7,14 +7,33 @@ import statsmodels.api as sm
 from datetime import datetime
 from matplotlib.patches import Patch
 
-def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, min_batterij=30):
-    errors = []
+# STREAMLIT 
+st.image("tra_logo_rgb_HR.png", width=400)
+page = 'Bus Planning Checker'
+
+with st.sidebar:
+    st.subheader('Navigation')
+    
+    if st.button("Bus Planning Checker", icon="🚍", use_container_width=True):
+        page = 'Bus Planning Checker'
+    if st.button('How It Works', icon="📖", use_container_width=True):
+        page = 'How It Works'
+    if st.button('Help', icon="❓", use_container_width=True):
+        page = 'Help'
+    
+    st.subheader('Parameters')
+    consumption_per_km = st.slider("**Battery Consumption Per KM**", 0.7, 2.5, 1.6)
+    SOH = st.slider("**State Of Health**", 0.85, 0.95, 0.90)
+
+
+def check_batterij_status(uploaded_file, distance_matrix, SOH, min_batterij=30):
+    
+    max_capacity = 300 * SOH
     
     # Gegevens inladen en DataFrame samenvoegen
     df = pd.merge(uploaded_file, distance_matrix, on=['startlocatie', 'eindlocatie', 'buslijn'], how='left')
 
-    # Consumptie voor kilometers
-    consumption_per_km = (0.7 + 2.5) / 2  
+    # Consumptie voor kilometers 
     df['consumptie_kWh'] = (df['afstand in meters'] / 1000) * consumption_per_km
 
     # Consumptie voor idle activiteiten
@@ -25,7 +44,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
     charging_speed_10 = 60 / 60   # kWh per minuut voor opladen van 90% tot 100%
 
     # Beginwaarden
-    battery_level = start_batterij
+    battery_level = max_capacity
     vorig_omloopnummer = df['omloop nummer'].iloc[0]
     # Ensure 'starttijd' column is datetime format, then extract only time for continuity check
     uploaded_file['starttijd'] = pd.to_datetime(uploaded_file['starttijd'], format='%H:%M').dt.time
@@ -38,7 +57,7 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
             battery_level -= row['consumptie_kWh']
             
             # Reset de batterij naar start_batterij
-            battery_level = start_batterij
+            battery_level = max_capacity
 
         # Opladen
         if row['activiteit'] == 'opladen':
@@ -68,7 +87,6 @@ def check_batterij_status(uploaded_file, distance_matrix, start_batterij=270, mi
         # Bij nieuwe omloop het omloopnummer updaten
         vorig_omloopnummer = row['omloop nummer']
     
-    return errors
 
 def check_route_continuity(bus_planning):
         """ Check if the endpoint of route n matches the start point of route n+1.
@@ -76,23 +94,21 @@ def check_route_continuity(bus_planning):
             - bus_planning: DataFrame with route data.
         Output: Print messages if there are inconsistencies.
         """
-    
-        errors = []
+
         #Controleer op NaN-waarden in 'omloop nummer'
         if bus_planning is None:
             st.error("NaN values found in 'omloop nummer' column.")
-            return errors
+
         required_columns = {'omloop nummer', 'startlocatie', 'eindlocatie', 'starttijd'}
         if not required_columns.issubset(bus_planning.columns):
             missing_columns = required_columns - set(bus_planning.columns)
             st.error(f"Missing columns in 'bus_planning': {missing_columns}")
-            return errors
+
 
     # Check for NaN values in critical columns
         if bus_planning[['omloop nummer', 'startlocatie', 'eindlocatie', 'starttijd']].isnull().any().any():
             st.error("NaN values found in critical columns of 'bus_planning'.")
-            return errors
-        
+           
     # Controleer de continuïteit van de routes
         for i in range(len(bus_planning) - 1):
             current_end_location = bus_planning.at[i, 'eindlocatie']
@@ -103,7 +119,6 @@ def check_route_continuity(bus_planning):
             if current_end_location != next_start_location:
                 st.error(f"Route continuity issue for bus {omloop_nummer:.0f} at {next_start_time}: "
                         f"ends at {current_end_location} and next route starts at {next_start_location}.")
-        return errors
 
 def driven_rides(bus_planning):
     clean_bus_planning = bus_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']]
@@ -111,15 +126,14 @@ def driven_rides(bus_planning):
     return clean_bus_planning
 
 def every_ride_covered(bus_planning, time_table):
-    errors = []
-        # Ensure columns are correctly named
+    # Ensure columns are correctly named
     if 'vertrektijd' in time_table.columns:
         time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
     
     # Check if 'starttijd' exists in both DataFrames
     if 'starttijd' not in bus_planning.columns or 'starttijd' not in time_table.columns:
-        errors.append("Missing 'starttijd' column in either 'bus_planning' or 'time_table'.")
-        return False, errors
+        st.errors("Missing 'starttijd' column in either 'bus_planning' or 'time_table'.")
+        return False
     bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
     time_table['starttijd'] = pd.to_datetime(time_table['starttijd'], errors='coerce')
     time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
@@ -136,30 +150,28 @@ def every_ride_covered(bus_planning, time_table):
     ).query('_merge == "right_only"')
 
     if not difference_bus_planning_to_time_table.empty:
-        errors.append("Rows only contained in bus planning:")
-        errors.append(difference_bus_planning_to_time_table.to_string())
+        st.errors("Rows only contained in bus planning:")
+        st.errors(difference_bus_planning_to_time_table.to_string())
        # st.dataframe(difference_bus_planning_to_time_table)  # Show the differences in Streamlit
-        return False, errors
+        return False
 
     if not difference_time_table_to_bus_planning.empty:
-        errors.append("Rows only contained in timetable:")
-        errors.append(difference_time_table_to_bus_planning.to_string())
+        st.errors("Rows only contained in timetable:")
+        st.errors(difference_time_table_to_bus_planning.to_string())
        # st.dataframe(difference_time_table_to_bus_planning)  # Show the differences in Streamlit
-        return False, errors
+        return False
 
     # If no differences are found, return success
     if difference_bus_planning_to_time_table.empty and difference_time_table_to_bus_planning.empty:
-        return "Bus planning is equal to timetable", errors
+        return "Bus planning is equal to timetable"
 
-    return True, errors
+    return True
 
 def check_travel_time(bus_planning, distance_matrix):
-    errors = []
-    
     # Check if 'starttijd' and 'eindtijd' columns exist
     if 'starttijd' not in bus_planning.columns or 'eindtijd' not in bus_planning.columns:
-        errors.append("Missing 'starttijd' or 'eindtijd' column in bus planning data.")
-        return False, errors
+        st.errors("Missing 'starttijd' or 'eindtijd' column in bus planning data.")
+        return False
     
     # Convert 'starttijd' and 'eindtijd' to datetime, handling errors
     bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], format='%H:%M:%S', errors='coerce')
@@ -167,9 +179,8 @@ def check_travel_time(bus_planning, distance_matrix):
     
     # Check if there are any NaT (null) values after conversion
     if bus_planning['starttijd'].isna().any() or bus_planning['eindtijd'].isna().any():
-        errors.append("Found invalid 'starttijd' or 'eindtijd' entries that could not be converted to time.")
-        st.error(errors[-1])
-        return False, errors
+        st.errors("Found invalid 'starttijd' or 'eindtijd' entries that could not be converted to time.")
+        return False
 
     # Calculate difference in minutes
     bus_planning['verschil_in_minuten'] = (bus_planning['eindtijd'] - bus_planning['starttijd']).dt.total_seconds() / 60
@@ -188,14 +199,7 @@ def check_travel_time(bus_planning, distance_matrix):
             error_message = (f"Row {index}: The difference in minutes ({row['verschil_in_minuten']:.0f}) "
                              f"is not between {row['max reistijd in min']} and {row['min reistijd in min']} "
                              f"for bus route {row['buslijn']} from {row['startlocatie']} to {row['eindlocatie']}.")
-            errors.append(error_message)
-            st.error(error_message)  # Display error in Streamlit
-
-    # Return results based on whether errors were found
-    if errors:
-        return False, errors
-    else:
-        return True, errors
+            st.errors(error_message)
 
 
 def plot_schedule_from_excel(bus_planning):
@@ -277,10 +281,6 @@ def plot_schedule_from_excel(bus_planning):
 
     st.pyplot(fig)
 
-# STREAMLIT 
-st.image("tra_logo_rgb_HR.png", width=400)
-st.sidebar.title('Navigation')
-
 def bus_checker_page(): 
     st.title("Bus Planning Checker")
 
@@ -303,37 +303,35 @@ def bus_checker_page():
             st.write('Gantt Chart Of Your Bus Planning:')
             plot_schedule_from_excel(bus_planning)  # Hier gebruiken we bus_planning in plaats van uploaded_file
 
-            st.write('There Were Mistakes Found In Your Bus Planning:')
-            errors = []
-
             if bus_planning.empty or time_table.empty or distance_matrix.empty:
                 st.error("One or more DataFrames are empty. Please check the uploaded files.")
                 return
 
             try: 
-                errors += check_batterij_status(bus_planning, distance_matrix)
+                check_batterij_status(bus_planning, distance_matrix, SOH)
             except Exception as e:
-                errors.append(f'Something went wrong checking battery: {str(e)}')
+                st.errors(f'Something went wrong checking battery: {str(e)}')
 
             try:
-                errors += check_route_continuity(bus_planning) 
+                check_route_continuity(bus_planning) 
             except Exception as e:
-                errors.append(f'Something went wrong checking route continuity: {str(e)}')
+                st.errors(f'Something went wrong checking route continuity: {str(e)}')
 
             try:
                 bus_planning = driven_rides(bus_planning)
             except Exception as e:
-                errors.append(f'Something went wrong checking driven rides: {str(e)}')
+                st.errors(f'Something went wrong checking driven rides: {str(e)}')
 
             try:
-                errors += every_ride_covered(bus_planning, time_table)  # Corrected from distance_matrix to time_table
+                every_ride_covered(bus_planning, time_table)  # Corrected from distance_matrix to time_table
             except Exception as e:
-                errors.append(f'Something went wrong checking if each ride is covered: {str(e)}')
+                st.errors(f'Something went wrong checking if each ride is covered: {str(e)}')
 
             try:
-                errors += check_travel_time(bus_planning, distance_matrix)
+                check_travel_time(bus_planning, distance_matrix)
             except Exception as e:
-                errors.append(f'Something went wrong checking the travel time: {str(e)}')
+                st.errors(f'Something went wrong checking the travel time: {str(e)}')
+                
                 
 def how_it_works_page():
     st.title("How It Works")
@@ -355,6 +353,7 @@ def how_it_works_page():
     6. **Error Reporting**: in cases where errors or discrepancies are found, the app provides detailed error messages. These messages include specific 
     information about the issue, such as route numbers, times, and locations, allowing for easy adjusting.
     """)
+    
 
 def help_page():
     st.title("Help")
@@ -406,12 +405,11 @@ def help_page():
         - **Invalid start or end time detected**: check entries for accurate time formats (HH:MM:SS) and ensure times are complete.
         - **Essential columns are missing in the bus planning data**: confirm that all rides have start and end times for reliable analysis.""")
 
-# Page Selector
-page = st.sidebar.selectbox('Select a Page', ['🚍 Bus Planning Checker', '📖 How It Works', '❓ Help'])
 
-if page == '🚍 Bus Planning Checker':
+# Page Selector
+if page == 'Bus Planning Checker':
     bus_checker_page()
-elif page == '📖 How It Works':
+elif page == 'How It Works':
     how_it_works_page()
-elif page == '❓ Help':
+elif page == 'Help':
     help_page()
