@@ -421,7 +421,7 @@ def bus_checker_page():
                 if battery_problems.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Battery dips under minimum State Of Charge')
+                    st.write('Battery dips below minimum State Of Charge')
                     with st.expander('Click to see the affected rows'):
                         st.dataframe(battery_problems)       
             except Exception as e:
