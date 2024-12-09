@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+import seaborn as sns
+
+
 
 # STREAMLIT CONFIGURATION
 st.logo("tra_logo_rgb_HR.png", size='large')
@@ -295,6 +298,91 @@ def plot_schedule_from_excel(bus_planning):
 
     st.pyplot(fig)
 
+
+def plot_activity_pie_chart(df):
+    """
+    Toont een cirkeldiagram van de verdeling van activiteiten in de totale planning.
+    """
+    df['starttijd'] = pd.to_datetime(df['starttijd'], format='%H:%M:%S', errors='coerce')
+    df['eindtijd'] = pd.to_datetime(df['eindtijd'], format='%H:%M:%S', errors='coerce')
+
+    # Bereken de tijdsduur voor elke activiteit
+    df['duur'] = (df['eindtijd'] - df['starttijd']).dt.total_seconds() / 3600
+
+    # Groepeer de data per activiteit en bereken de totale tijd per activiteit
+    stapel_data = df.groupby('activiteit')['duur'].sum().reset_index()
+
+    # Voeg ontbrekende activiteiten toe
+    activiteit_labels = ['opladen', 'idle']
+    for label in activiteit_labels:
+        if label not in stapel_data['activiteit'].values:
+            stapel_data = stapel_data.append({'activiteit': label, 'duur': 0}, ignore_index=True)
+
+    nieuwe_labels = ['Regular Trip', 'Idle', 'Deadhead Trip', 'Charging']
+
+    # Maak de figuur en plot
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.pie(
+        stapel_data['duur'], 
+        labels=None, 
+        autopct=lambda pct: f'{pct:.1f}%', 
+        startangle=90, 
+        colors=['blue', 'red', 'green', 'orange'], 
+        textprops={'fontsize': 14, 'fontweight': 'bold'}
+    )
+    ax.legend(nieuwe_labels, loc="best")
+    ax.set_title('Distribution of Activities in the Total Planning')
+    st.pyplot(fig)
+
+def plot_charging_heatmap(df):
+    """
+    Toont een heatmap van de activiteit 'opladen' per uur van de dag.
+    """
+    df['starttijd'] = pd.to_datetime(df['starttijd'], format='%H:%M:%S', errors='coerce')
+    df['uur'] = df['starttijd'].dt.hour
+    opladen_df = df[df['activiteit'] == 'opladen']
+    heatmap_data = opladen_df['uur'].value_counts().reindex(range(24), fill_value=0)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(
+        heatmap_data.values.reshape(1, -1), 
+        cmap='YlGnBu', 
+        annot=True, 
+        cbar=True, 
+        ax=ax, 
+        xticklabels=[f"{hour}:00" for hour in range(24)], 
+        yticklabels=["Opladen"]
+    )
+    ax.set_title('Heatmap of Activity "Charging" per Hour')
+    ax.set_xlabel('Hour of the Day')
+    ax.set_ylabel('Activity')
+    st.pyplot(fig)
+
+def plot_activity_bar_chart(df):
+    """
+    Toont een stapelgrafiek van de totale tijd per activiteit.
+    """
+    df['starttijd'] = pd.to_datetime(df['starttijd'], format='%H:%M:%S', errors='coerce')
+    df['eindtijd'] = pd.to_datetime(df['eindtijd'], format='%H:%M:%S', errors='coerce')
+    df['duur'] = (df['eindtijd'] - df['starttijd']).dt.total_seconds() / 3600
+
+    stapel_data = df.groupby('activiteit')['duur'].sum().reset_index()
+
+    activiteit_labels = ['opladen', 'idle']
+    for label in activiteit_labels:
+        if label not in stapel_data['activiteit'].values:
+            stapel_data = stapel_data.append({'activiteit': label, 'duur': 0}, ignore_index=True)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(stapel_data['activiteit'], stapel_data['duur'], color=['blue', 'red', 'green', 'orange'])
+    nieuwe_labels = ['Regular Trip', 'Idle', 'Deadhead Trip', 'Charging']
+    ax.set_xticks(range(len(nieuwe_labels)))
+    ax.set_xticklabels(nieuwe_labels, fontsize=12)
+    ax.set_title('Total Time per Activity')
+    ax.set_xlabel('Activity')
+    ax.set_ylabel('Total Time (Hours)')
+    st.pyplot(fig)
+
 # KPI FUNCTIONS
 def count_buses(bus_planning):
     """Count unique 'omloop nummer' values in bus planning."""
@@ -383,11 +471,28 @@ def bus_checker_page():
                 st.dataframe(bus_planning, hide_index=True)
 
                 st.write('Gantt Chart Of Your Bus Planning:')
-                plot_schedule_from_excel(bus_planning)  
+                plot_schedule_from_excel(bus_planning) 
+
+                st.write("")
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.write("Pie Chart:")
+                    plot_activity_pie_chart(bus_planning)
+
+                with col2:
+                    st.write("Heatmap:")
+                    plot_charging_heatmap(bus_planning)
+
+                with col3:
+                    st.write("Bar Chart:")
+                    plot_activity_bar_chart(bus_planning)
             
                 if bus_planning.empty or time_table.empty or distance_matrix.empty:
                     st.error("One or more DataFrames are empty. Please check the uploaded files.")
                     return
+                
+                st.write('(Click on the graph to enlarge it)')
 
     with tab3:
             # Dislay KPIs
