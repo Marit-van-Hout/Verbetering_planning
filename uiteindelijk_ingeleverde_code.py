@@ -220,7 +220,7 @@ def check_travel_time(bus_planning, distance_matrix):
                 'starttijd': row['starttijd']
             })
 
-    return pd.DataFrame(issues) if issues else pd.DataFrame(columns=['omloop nummer', 'startlocatie', 'eindlocatie', 'reistijd', 'starttijd'])
+    return pd.DataFrame(issues)
 
 # VISUALISATION FUNCTION
 def plot_schedule_from_excel(bus_planning):
