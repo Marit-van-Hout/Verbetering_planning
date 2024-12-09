@@ -50,8 +50,8 @@ def check_battery_status(bus_planning, distance_matrix, SOH, min_SOC, consumptio
     df.loc[df['activiteit'] == 'idle', 'consumption (kWh)'] = 0.01
 
     # Charging speeds
-    charging_speed_90 = 450 / 60  # Charging speed below 90% in kWh per minute
-    charging_speed_10 = 60 / 60   # Charging speed above 90% in kWh per minute
+    charging_speed_90 = 450 / 60  # Charging speed below 90% in kWh 
+    charging_speed_10 = 60 / 60   # Charging speed above 90% in kWh 
 
     battery_level = max_capacity
     previous_loop_number = None
