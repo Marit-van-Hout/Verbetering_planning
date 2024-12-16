@@ -434,7 +434,7 @@ def calculate_energy_consumption(bus_planning, distance_matrix, consumption_per_
 def bus_checker_page(): 
     st.header("Bus Planning Checker")
 
-    tab1, tab2, tab3 = st.tabs(['Data and Parameters', 'Your Data', 'Validity Checks'])
+    tab1, tab2, tab3 = st.tabs(['Data and Parameters', 'Validity Checks', 'Your Data'])
     
     with tab1:
         # File uploaders
@@ -451,7 +451,7 @@ def bus_checker_page():
         min_SOC =               st.slider("**Minimum State Of Charge** - %", 5, 25, 10)
         consumption_per_km =    st.slider("**Battery Consumption Per KM** - KwH", 0.7, 2.5, 1.6)
 
-    with tab2:
+    with tab3:
         # Check if the required files are uploaded
         if not uploaded_file or not given_data:
             st.error("You need to upload your data in the 'Data and Parameters' tab.")
@@ -492,9 +492,9 @@ def bus_checker_page():
                     st.error("One or more DataFrames are empty. Please check the uploaded files.")
                     return
                 
-                st.write('(Click on the graph to enlarge it)')
+                st.write('(Click on the graph to expand)')
 
-    with tab3:
+    with tab2:
             # Dislay KPIs
             st.subheader('KPIs')
             met_col1, met_col2, met_col3 = st.columns(3)
@@ -526,7 +526,7 @@ def bus_checker_page():
                 if battery_problems.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Battery dips below minimum State Of Charge')
+                    st.markdown(':red[Battery dips below minimum State Of Charge]')
                     with st.expander('Click to see the affected rows'):
                         st.dataframe(battery_problems)       
             except Exception as e:
@@ -539,7 +539,7 @@ def bus_checker_page():
                 if continuity_problems.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Start and end location do not line up')
+                    st.markdown(':red[Start and end location do not line up]')
                     with st.expander('Click to see the affected rows'):
                         st.dataframe(continuity_problems)
             except Exception as e:
@@ -558,7 +558,7 @@ def bus_checker_page():
                 if ride_coverage.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Some trips included in timetable are not present in bus pallning, or vice versa')
+                    st.markdown(':red[Some trips included in timetable are not present in bus pallning, or vice versa]')
                     with st.expander('Click to see the affected rows'):
                         st.dataframe(ride_coverage)             
             except Exception as e:
@@ -571,7 +571,7 @@ def bus_checker_page():
                 if travel_time.empty:
                     st.write('No problems found!')
                 else:
-                    st.write('Travel time outside of bound as specified in distance matrix')
+                    st.markdown(':red[Travel time outside of bound as specified in distance matrix]')
                     with st.expander('Click to see the affected rows'):
                         st.dataframe(travel_time)  
             except Exception as e:
