@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import seaborn as sns
 
-
-
 # STREAMLIT CONFIGURATION
 st.logo("tra_logo_rgb_HR.png", size='large')
 page = 'Bus Planning Checker'  # Default page before any button is clicked
@@ -298,7 +296,6 @@ def plot_schedule_from_excel(bus_planning):
 
     st.pyplot(fig)
 
-
 def plot_activity_pie_chart(df):
     """
     Toont een cirkeldiagram van de verdeling van activiteiten in de totale planning.
@@ -467,33 +464,31 @@ def bus_checker_page():
                     st.error(f"Error reading Excel files: {str(e)}")
                     return
 
-                st.write('Your Bus Planning:')
+                st.write('**Your Bus Planning**')
                 st.dataframe(bus_planning, hide_index=True)
 
-                st.write('Gantt Chart Of Your Bus Planning:')
+                st.write('**Gantt Chart Of Your Bus Planning**')
                 plot_schedule_from_excel(bus_planning) 
 
-                st.write("")
-
+                st.write('**Activity Visualisations Of Your Bus Planning**')
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.write("Pie Chart:")
+                    st.write("Distribution of activities")
                     plot_activity_pie_chart(bus_planning)
 
                 with col2:
-                    st.write("Heatmap:")
+                    st.write("Distribution of charging")
                     plot_charging_heatmap(bus_planning)
 
                 with col3:
-                    st.write("Bar Chart:")
+                    st.write("Total time per activity")
                     plot_activity_bar_chart(bus_planning)
             
                 if bus_planning.empty or timetable.empty or distance_matrix.empty:
                     st.error("One or more DataFrames are empty. Please check the uploaded files.")
                     return
+                st.write('*Click on the graph to expand*')
                 
-                st.write('(Click on the graph to expand)')
-
     with tab2:
             # Dislay KPIs
             st.subheader('KPIs')
@@ -580,38 +575,36 @@ def bus_checker_page():
 def how_it_works_page():
     st.header("How It Works")
 
-    st.write("**The app checks the following conditions:**")
+    st.write("**The tool checks the following conditions:**")
 
     st.markdown("""
-    1. **Battery Status**: the app checks and ensures that the battery level of the bus does not drop below **10%** of the State of Health, which is **30 kWh**. 
-    The system accounts for both driving and idle time consumption and models charging times at two rates: a higher rate for charging up to **90%** and a slower rate beyond that. 
+    1. **Battery Status**: the tool checks that the battery level of the bus does not drop below the minimum of the State of Charge, which is **10%** by default. 
+    The system accounts for both driving and idle time consumption and charging times at two rates: a higher rate for charging up to **90%** and a slower rate beyond that. 
 
-    2. **Route Continuity**: the app checks that the endpoint of each route aligns with the starting location of the following route to maintain continuity in the bus's journey. 
+    2. **Route Continuity**: the tool checks that the end location of each route aligns with the starting location of the following route. 
+    
+    3. **Trip Coverage**: the tool ensures that every trip listed in the **timetable** is matched in the **bus planning**, and vice versa. 
 
-    3. **Travel Time**: the app confirms that the travel time for each route falls within the predefined range. 
+    4. **Travel Time**: the tool confirms that the travel time for each route falls within the predefined range included in the distance matrix. 
 
-    4. **Coverage of Scheduled Rides**: the app ensures that every Trip listed in the **timetable** is matched in the **bus planning** records. 
+    5. **Data Consistency**: the tool verifies that all critical columns are present in your data. 
 
-    5. **Data Consistency**: the app verifies that all critical columns are present in your data. 
-
-    6. **Error Reporting**: in cases where errors or discrepancies are found, the app provides detailed error messages. These messages include specific 
-    information about the issue, such as route numbers, times, and locations, allowing for easy adjusting.
     """)
     
 def help_page():
     st.header("Help")
 
-    tab1, tab2, tab3 = st.tabs(['How To Use', 'Troubleshooting', 'Error Interpretation'])
+    tab1, tab2 = st.tabs(['How To Use', 'Troubleshooting'])
 
     with tab1:
         st.subheader("**Need assistance?**")
         st.write("**This is how to use the app**")
 
         st.markdown("""1. Go to the navigation panel and select ‘Bus Planning Checker’.""")
-        st.image('Picture1.png', width=200)
+        st.image('nav_panel.png', width=200)
 
         st.markdown("""2. You should be presented with the following page. Here you can upload your bus planning and your timetable.""")
-        st.image('Picture2.png', width=600)
+        st.image('bus_planning_page.png', width=600)
 
         st.markdown("""
         ---
@@ -620,33 +613,30 @@ def help_page():
         - Follow the correct upload sequence  to ensure accurate results
         - Both files must be .xlsx files
         ---
-        3. Results appear on the same page after uploading both files. You will find:
-            - The uploaded bus planning for easy viewing and verification
-            - A visualization of the planning to help you identify issues at a glance.
-            - A list of detected issues or inconsistencies in your planning""")
-        st.image('Picture3.png', width=400)
+        3. You can view the validity of your planning in the **Validity Checks** tab. You will find:
+            - KPIs to quickly assess the quality of your planning and compare different plans
+            - The validity of your planning against various criteria""")
+        
+        st.image('validity_checks.png', width=400)
+        st.write('Use the dropdown menu to identify and review affected rows if issues are found.')
+        st.image('affected_rows.png', width=400)
+        
+        st.markdown("""
+        4. You can view the validity of your planning in the **Your Data** tab. You will find:
+            - An Excel sheet of the bus planning
+            - A Gantt chart of your planning
+            - Three graphs showing the activity distribution in your planning""")
+        
+        st.image('your_data.png', width=400)
 
     with tab2:
         st.subheader("**Troubleshooting**")
         st.markdown("""
         **Things to do if you are having trouble uploading your files**
         - Ensure that the files are .xlsx files. Any other file format will not work
-        - Verify that you uploaded the files in the correct order. The bus planning at the top, the timetable at the bottom
+        - Verify that you uploaded the files in the correct order. The bus planning on the left, the timetable on the right
         - Verify that the files are complete and contain all required fields. Missing data or headers may result in errors during analysis
         - If the issue persists, try refreshing the page and re-uploading the files""")
-
-    with tab3:
-        st.subheader("**Error interpretation**")
-        st.write("**Not sure what an error means? Here you can find some more explanation**")
-        st.markdown("""
-        - **Battery under minimum threshold detected**: check route timing and ensure that sufficient charging time is allocated.
-        - **Route continuity issue found**: ensure that the endpoint of the previous route matches the start location of the next route.
-        - **Some rides may be missing bus line entries**: Make sure all routes are clearly labeled with their bus lines to avoid mismatches.
-        - **Inconsistencies found between bus planning and timetable data**: ensure that all timetable rides are included in the bus planning and vice versa.
-        - **Missing start time column in either bus planning or timetable file**: verify both files contain start times for accurate matching.
-        - **The calculated travel time for bus line from start location to end location is outside the expected range**: check timing and distance data to ensure accuracy.
-        - **Invalid start or end time detected**: check entries for accurate time formats (HH:MM:SS) and ensure times are complete.
-        - **Essential columns are missing in the bus planning data**: confirm that all rides have start and end times for reliable analysis.""")
 
 
 # PAGE SELECTOR
