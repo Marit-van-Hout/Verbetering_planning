@@ -625,7 +625,7 @@ def help_page():
         4. You can view the validity of your planning in the **Your Data** tab. You will find:
             - An Excel sheet of the bus planning
             - A Gantt chart of your planning
-            - Three graphs showing the activity distribution in your planning""")
+            - Three graphs showing the activity distribution of your planning""")
         
         st.image('your_data.png', width=400)
 
