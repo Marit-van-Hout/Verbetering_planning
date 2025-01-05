@@ -145,27 +145,27 @@ def driven_rides(bus_planning):
     """
     return bus_planning[['startlocatie', 'starttijd', 'eindlocatie', 'buslijn']].dropna(subset=['buslijn'])
 
-def every_ride_covered(bus_planning, time_table):
+def every_ride_covered(bus_planning, timetable):
     """
     Checks if every Trip in the bus planning is covered in the timetable.
     Args:
         bus_planning (DataFrame): Planned rides.
-        time_table (DataFrame): Timetable rides.
+        timetable (DataFrame): Timetable rides.
     Returns:
         DataFrame: Discrepancies between planning and timetable.
     """
-    if 'vertrektijd' in time_table.columns:
-        time_table = time_table.rename(columns={'vertrektijd': 'starttijd'})
+    if 'vertrektijd' in timetable.columns:
+        timetable = timetable.rename(columns={'vertrektijd': 'starttijd'})
 
-    if 'starttijd' not in bus_planning.columns or 'starttijd' not in time_table.columns:
+    if 'starttijd' not in bus_planning.columns or 'starttijd' not in timetable.columns:
         st.error("Missing 'starttijd' column in bus planning or timetable.")
         return pd.DataFrame()
 
     bus_planning['starttijd'] = pd.to_datetime(bus_planning['starttijd'], errors='coerce')
-    time_table['starttijd'] = pd.to_datetime(time_table['starttijd'], errors='coerce')
+    timetable['starttijd'] = pd.to_datetime(timetable['starttijd'], errors='coerce')
 
     differences = bus_planning.merge(
-        time_table, on=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn'], how='outer', indicator=True
+        timetable, on=['startlocatie', 'starttijd', 'eindlocatie', 'buslijn'], how='outer', indicator=True
     )
 
     issues = differences.query('_merge != "both"')
@@ -442,9 +442,9 @@ def bus_checker_page():
         col1, col2 = st.columns(2)
     
         with col1:
-            uploaded_file = st.file_uploader("Upload Your Bus Planning Here", type="xlsx")
+            uploaded_file = st.file_uploader("Upload Your **Bus Planning** Here", type="xlsx")
         with col2:
-            given_data = st.file_uploader("Upload Your Time Table Here", type="xlsx")
+            given_data = st.file_uploader("Upload Your **Timetable** Here", type="xlsx")
         
         st.subheader('Parameters')
         SOH =                   st.slider("**State Of Health** - %", 85, 95, 90)
@@ -461,7 +461,7 @@ def bus_checker_page():
             with st.spinner('Your data is being processed...'): 
                 try:
                     bus_planning = pd.read_excel(uploaded_file)
-                    time_table = pd.read_excel(given_data, sheet_name='Dienstregeling')
+                    timetable = pd.read_excel(given_data, sheet_name='Dienstregeling')
                     distance_matrix = pd.read_excel(given_data, sheet_name="Afstandsmatrix")
                 except Exception as e:
                     st.error(f"Error reading Excel files: {str(e)}")
@@ -488,7 +488,7 @@ def bus_checker_page():
                     st.write("Bar Chart:")
                     plot_activity_bar_chart(bus_planning)
             
-                if bus_planning.empty or time_table.empty or distance_matrix.empty:
+                if bus_planning.empty or timetable.empty or distance_matrix.empty:
                     st.error("One or more DataFrames are empty. Please check the uploaded files.")
                     return
                 
@@ -554,7 +554,7 @@ def bus_checker_page():
             # Iedere Nodige Rit Wordt Gereden
             st.subheader('Trip Coverage')
             try:
-                ride_coverage = every_ride_covered(bus_planning, time_table)
+                ride_coverage = every_ride_covered(bus_planning, timetable)
                 if ride_coverage.empty:
                     st.write('No problems found!')
                 else:
