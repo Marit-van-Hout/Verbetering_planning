@@ -313,7 +313,7 @@ def plot_activity_pie_chart(df):
     activiteit_labels = ['opladen', 'idle']
     for label in activiteit_labels:
         if label not in stapel_data['activiteit'].values:
-            stapel_data = stapel_data.append({'activiteit': label, 'duur': 0}, ignore_index=True)
+            stapel_data = stapel_data._append({'activiteit': label, 'duur': 0}, ignore_index=True)
 
     nieuwe_labels = ['Regular Trip', 'Idle', 'Deadhead Trip', 'Charging']
 
@@ -368,7 +368,7 @@ def plot_activity_bar_chart(df):
     activiteit_labels = ['opladen', 'idle']
     for label in activiteit_labels:
         if label not in stapel_data['activiteit'].values:
-            stapel_data = stapel_data.append({'activiteit': label, 'duur': 0}, ignore_index=True)
+            stapel_data = stapel_data._append({'activiteit': label, 'duur': 0}, ignore_index=True)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.bar(stapel_data['activiteit'], stapel_data['duur'], color=['blue', 'red', 'green', 'orange'])
