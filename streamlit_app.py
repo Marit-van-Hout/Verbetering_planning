@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import seaborn as sns
 
-# STREAMLIT CONFIGURATION
+# STREAMLIT CONFIGURATION 
+# changes: replaced st.pages with st.button and adjusted the code slightly to adhere to the logic of the new function
 # Display the logo on the Streamlit app
 st.logo("tra_logo_rgb_HR.png", size='large')
 
@@ -24,6 +25,8 @@ with st.sidebar:
         page = 'Help'
 
 # VALIDITY FUNCTIONS
+# changes: functions now return a dataframe with rows that do not adhere to the criteria checked for in each function, 
+# instead of individual error messages.
 def check_battery_status(bus_planning, distance_matrix, SOH, min_SOC, consumption_per_km):
     """
     Validates battery status throughout the bus schedule and adds state of charge (SOC) as a column.
@@ -66,8 +69,6 @@ def check_battery_status(bus_planning, distance_matrix, SOH, min_SOC, consumptio
     state_of_charge = []  # Track SOC for each row
 
     for i, row in df.iterrows():
-        next_start_time = bus_planning['starttijd'].iloc[i + 1] if i + 1 < len(bus_planning) else None
-
         # Reset battery level for new loops
         if row['omloop nummer'] != previous_loop_number:
             battery_level = max_capacity
@@ -249,7 +250,10 @@ def check_travel_time(bus_planning, distance_matrix):
 
     return pd.DataFrame(issues)
 
-# VISUALISATION FUNCTION
+# VISUALISATION FUNCTIONS
+# changes: added three functions to plot the activity distribution of the bus planning to gain better insight. 
+# plot_activity_pie_chart(df), plot_charging_heatmap(df), plot_activity_bar_chart(df) 
+
 def plot_schedule_from_excel(bus_planning):
     """Plot a Gantt chart for bus scheduling based on a DataFrame."""
     required_columns = ['starttijd', 'eindtijd', 'buslijn', 'omloop nummer', 'activiteit']
@@ -423,7 +427,7 @@ def plot_activity_bar_chart(df):
     st.pyplot(fig)
 
 # KPI FUNCTIONS
-
+# changes: added functions to calculate KPI's; number of buses used in bus planning, deadhead minutes, total energy consumption
 def count_buses(bus_planning):
     """Count the number of unique 'omloop nummer' values in the bus planning data.
 
@@ -502,7 +506,11 @@ def calculate_energy_consumption(bus_planning, distance_matrix, consumption_per_
     return total_energy_consumed
 
 # PAGE DEFINITIONS
-
+# changes: added tabs to bus planning checker page; Data and Parameters, Validity Checks, Your Data.
+# added three parameter sliders, one for SOH, minimum SOC and battery consumption per km.
+# changed the error dislpay of every criterium from a list of errors to a dropdown menu if errors were found, and 'No problems found!' if not.
+# changed the 'help' page to be applicable to the updated functionality of the tool
+# changed the 'how it works' page to be applicable to the updated functionality of the tool and removed information that was made redundant.
 def bus_checker_page(): 
     """Define the layout and functionality of the Bus Planning Checker page."""
     st.header("Bus Planning Checker")
